@@ -21,9 +21,21 @@ func main(){
 	http.HandleFunc("/health", handlers.Health)
 	http.HandleFunc("/config", handlers.Config)
 	http.HandleFunc("/auth/register", authHandler.Register)
-	http.HandleFunc("/auth/me", middleware.RequireAuth(authHandler.Me))
+	http.HandleFunc("/auth/me", middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			authHandler.Me(w, r)
+		case http.MethodPatch:
+			authHandler.UpdateMe(w, r)
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte(`{"error":"unsupported method"}`))
+		}
+	}))
 	http.HandleFunc("/auth/logout", authHandler.Logout)
 	http.HandleFunc("/auth/refresh", middleware.RequireAuth(authHandler.Refresh))
+	http.HandleFunc("/auth/validate", middleware.RequireAuth(authHandler.Validate))
 	http.HandleFunc("/auth/change-password", middleware.RequireAuth(authHandler.ChangePassword))
 	http.HandleFunc("/auth/login", authHandler.Login)
 	fmt.Println("Server started: http://localhost:8080")

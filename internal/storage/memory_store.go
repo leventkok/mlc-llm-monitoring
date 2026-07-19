@@ -70,9 +70,16 @@ func (s *MemoryStore) Update(user models.User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.usersByID[user.ID]; !ok {
+	eski, ok := s.usersByID[user.ID]
+	if !ok {
 		return ErrUserNotFound
 	}
+
+	if eski.Username != user.Username {
+		delete(s.usernameToID, eski.Username)
+		s.usernameToID[user.Username] = user.ID
+	}
+
 	s.usersByID[user.ID] = user
 	return nil
 }
