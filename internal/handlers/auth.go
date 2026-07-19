@@ -16,52 +16,51 @@ type AuthHandler struct {
 	store storage.UserStore
 }
 
-func NewAuthHandler(store storage.UserStore) * AuthHandler{
+func NewAuthHandler(store storage.UserStore) *AuthHandler {
 	return &AuthHandler{store: store}
 }
 
-type reigsterRequest struct{
+type registerRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-
-func (h *AuthHandler) Register(w http.ResponseWriter, r* http.Request){
+func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	if r.Method != http.MethodPost{
+	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{"error" : "only POST"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "only POST"})
 		return
 	}
 
-	var req reigsterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil{
+	var req registerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error" : "invalid JSON"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
 		return
 	}
 
 	if req.Username == "" || req.Password == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error" : "username and password are required"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "username and password are required"})
+		return
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-
-	if err != nil{
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "password not match"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "password could not be processed"})
 		return
 	}
 
 	user := models.User{
-		ID: uuid.NewString(),
-		Username: req.Username,
+		ID:           uuid.NewString(),
+		Username:     req.Username,
 		PasswordHash: string(hash),
 	}
 
-	if err := h.store.Create(user); err !=nil{
+	if err := h.store.Create(user); err != nil {
 		w.WriteHeader(http.StatusConflict)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -69,18 +68,15 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r* http.Request){
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
-		"id": user.ID,
+		"id":       user.ID,
 		"username": user.Username,
 	})
-
-
 }
 
-type loginRequest struct{
+type loginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
-
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -100,12 +96,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.store.FindByUsername(req.Username)
 	if err != nil {
-		
-		w.WriteHeader(http.StatusUnauthorized) // 401
+		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"error": "incorrect username or password"})
 		return
 	}
-
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -116,7 +110,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	token, err := auth.GenerateToken(user.ID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Token not generated."})
+		json.NewEncoder(w).Encode(map[string]string{"error": "token could not be generated"})
 		return
 	}
 
@@ -124,7 +118,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		"token": token,
 	})
 }
-
 
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -149,11 +142,10 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
-func (h * AuthHandler) Logout(w http.ResponseWriter, r*http.Request) {
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"message" : "Logged out, please delete token on the client side",
+		"message": "Logged out, please delete token on the client side",
 	})
 }
 
@@ -170,7 +162,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	token, err := auth.GenerateToken(userID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "token not be generated"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "token could not be generated"})
 		return
 	}
 
@@ -220,16 +212,84 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "password not be processed"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "password could not be processed"})
 		return
 	}
 
 	user.PasswordHash = string(newHash)
 	if err := h.store.Update(user); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "not change"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "could not be updated"})
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"message": "Password change"})
+	json.NewEncoder(w).Encode(map[string]string{"message": "password changed"})
+}
+
+type updateMeRequest struct {
+	Username string `json:"username"`
+}
+
+func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	var req updateMeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		return
+	}
+	if req.Username == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "username cannot be empty"})
+		return
+	}
+
+	user, err := h.store.FindByID(userID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
+		return
+	}
+
+	if existing, err := h.store.FindByUsername(req.Username); err == nil && existing.ID != userID {
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": "this username is already taken"})
+		return
+	}
+
+	user.Username = req.Username
+	if err := h.store.Update(user); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "could not be updated"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"id":       user.ID,
+		"username": user.Username,
+	})
+}
+
+func (h *AuthHandler) Validate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"valid":   true,
+		"user_id": userID,
+	})
 }
