@@ -3,13 +3,40 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/leventkok/mlc-llm-monitoring/internal/models"
+	"github.com/leventkok/mlc-llm-monitoring/internal/storage"
 )
 
-func Config(w http.ResponseWriter, r *http.Request) {
+type ConfigHandler struct {
+	store *storage.ConfigStore
+}
+
+func NewConfigHandler(store *storage.ConfigStore) *ConfigHandler {
+	return &ConfigHandler{store: store}
+}
+
+func (h *ConfigHandler) Get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"app_name": "mlc-llm-monitoring",
-		"model":    "gemma-3-1b-it",
-		"version":  "0.1.0",
-	})
+	json.NewEncoder(w).Encode(h.store.Get())
+}
+
+func (h *ConfigHandler) Update(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var req models.Config
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		return
+	}
+
+	if req.AppName == "" || req.Model == "" || req.Version == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "app_name, model and version are required"})
+		return
+	}
+
+	updated := h.store.Update(req)
+	json.NewEncoder(w).Encode(updated)
 }

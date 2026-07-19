@@ -9,18 +9,30 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/internal/storage"
 )
 
-
-
-
-
-func main(){
+func main() {
 	store := storage.NewMemoryStore()
-	authHandler := handlers.NewAuthHandler(store)
+	configStore := storage.NewConfigStore()
 
+	authHandler := handlers.NewAuthHandler(store)
+	configHandler := handlers.NewConfigHandler(configStore)
 
 	http.HandleFunc("/health", handlers.Health)
-	http.HandleFunc("/config", handlers.Config)
+
+	http.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			configHandler.Get(w, r)
+		case http.MethodPut:
+			configHandler.Update(w, r)
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte(`{"error":"unsupported method"}`))
+		}
+	})
+
 	http.HandleFunc("/auth/register", authHandler.Register)
+	http.HandleFunc("/auth/login", authHandler.Login)
 	http.HandleFunc("/auth/me", middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -37,7 +49,7 @@ func main(){
 	http.HandleFunc("/auth/refresh", middleware.RequireAuth(authHandler.Refresh))
 	http.HandleFunc("/auth/validate", middleware.RequireAuth(authHandler.Validate))
 	http.HandleFunc("/auth/change-password", middleware.RequireAuth(authHandler.ChangePassword))
-	http.HandleFunc("/auth/login", authHandler.Login)
+
 	fmt.Println("Server started: http://localhost:8080")
 	http.ListenAndServe(":8080", nil)
 }
