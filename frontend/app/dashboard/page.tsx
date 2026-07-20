@@ -21,9 +21,17 @@ export default function DashboardPage() {
   const [modelReady, setModelReady] = useState(false);
 
   useEffect(() => {
-    reviewApi
-      .list()
-      .then(setReviews)
+    Promise.all([reviewApi.list(), reviewApi.decisions()])
+      .then(([revs, decs]) => {
+        setReviews(revs);
+        const byReview: Record<string, Decision> = {};
+        for (const d of decs) {
+          if (!byReview[d.review_id]) {
+            byReview[d.review_id] = d;
+          }
+        }
+        setDecisions(byReview);
+      })
       .catch(() => {});
   }, []);
 

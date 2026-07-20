@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/leventkok/mlc-llm-monitoring/internal/auth"
@@ -21,6 +22,7 @@ func NewAuthHandler(store storage.UserStore) *AuthHandler {
 }
 
 type registerRequest struct {
+	Email    string `json:"email"`
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
@@ -41,9 +43,17 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Password == "" {
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	req.Username = strings.TrimSpace(req.Username)
+
+	if req.Email == "" || req.Username == "" || req.Password == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "username and password are required"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "email, username and password are required"})
+		return
+	}
+	if !strings.Contains(req.Email, "@") {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid email address"})
 		return
 	}
 
@@ -56,11 +66,22 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	user := models.User{
 		ID:           uuid.NewString(),
+		Email:        req.Email,
 		Username:     req.Username,
 		PasswordHash: string(hash),
 	}
 
 	if err := h.store.Create(user); err != nil {
+		if err == storage.ErrEmailTaken {
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]string{"error": "this email is already registered"})
+			return
+		}
+		if err == storage.ErrUsernameTaken {
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]string{"error": "this username is already taken"})
+			return
+		}
 		w.WriteHeader(http.StatusConflict)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
@@ -69,12 +90,13 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":       user.ID,
+		"email":    user.Email,
 		"username": user.Username,
 	})
 }
 
 type loginRequest struct {
-	Username string `json:"username"`
+	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
@@ -94,16 +116,18 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.FindByUsername(req.Username)
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+
+	user, err := h.store.FindByEmail(req.Email)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "incorrect username or password"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "incorrect email or password"})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "incorrect username or password"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "incorrect email or password"})
 		return
 	}
 
@@ -138,6 +162,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":       user.ID,
+		"email":    user.Email,
 		"username": user.Username,
 	})
 }
@@ -274,6 +299,7 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":       user.ID,
+		"email":    user.Email,
 		"username": user.Username,
 	})
 }

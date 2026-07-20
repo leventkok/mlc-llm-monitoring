@@ -14,8 +14,8 @@ type ConfigStore struct {
 func NewConfigStore() *ConfigStore {
 	return &ConfigStore{
 		config: models.Config{
-			AppName: "mlc-llm-monitoring",
-			Model:   "gemma-3-1b-it",
+			AppName: "app-review-monitoring",
+			Model:   "gemma-2-2b-it-q4f16_1-MLC",
 			Version: "0.1.0",
 		},
 	}

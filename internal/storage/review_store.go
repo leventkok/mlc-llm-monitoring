@@ -9,22 +9,22 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/internal/models"
 )
 
-
 func (s *PostgresStore) CreateReview(r models.Review) error {
 	_, err := s.pool.Exec(
 		context.Background(),
-		`INSERT INTO reviews (id, app_name, store, rating, text)
-		 VALUES ($1, $2, $3, $4, $5)`,
-		r.ID, r.AppName, r.Store, r.Rating, r.Text,
+		`INSERT INTO reviews (id, user_id, app_name, store, rating, text)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		r.ID, r.UserID, r.AppName, r.Store, r.Rating, r.Text,
 	)
 	return err
 }
 
-func (s *PostgresStore) ListReviews() ([]models.Review, error) {
+func (s *PostgresStore) ListReviews(userID string) ([]models.Review, error) {
 	rows, err := s.pool.Query(
 		context.Background(),
-		`SELECT id, app_name, store, rating, text, created_at
-		 FROM reviews ORDER BY created_at DESC`,
+		`SELECT id, user_id, app_name, store, rating, text, created_at
+		 FROM reviews WHERE user_id = $1 ORDER BY created_at DESC`,
+		userID,
 	)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func (s *PostgresStore) ListReviews() ([]models.Review, error) {
 	var reviews []models.Review
 	for rows.Next() {
 		var r models.Review
-		if err := rows.Scan(&r.ID, &r.AppName, &r.Store, &r.Rating, &r.Text, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.UserID, &r.AppName, &r.Store, &r.Rating, &r.Text, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		reviews = append(reviews, r)
@@ -42,13 +42,14 @@ func (s *PostgresStore) ListReviews() ([]models.Review, error) {
 	return reviews, rows.Err()
 }
 
-func (s *PostgresStore) GetReview(id string) (models.Review, error) {
+func (s *PostgresStore) GetReviewForUser(id, userID string) (models.Review, error) {
 	var r models.Review
 	err := s.pool.QueryRow(
 		context.Background(),
-		`SELECT id, app_name, store, rating, text, created_at FROM reviews WHERE id = $1`,
-		id,
-	).Scan(&r.ID, &r.AppName, &r.Store, &r.Rating, &r.Text, &r.CreatedAt)
+		`SELECT id, user_id, app_name, store, rating, text, created_at
+		 FROM reviews WHERE id = $1 AND user_id = $2`,
+		id, userID,
+	).Scan(&r.ID, &r.UserID, &r.AppName, &r.Store, &r.Rating, &r.Text, &r.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.Review{}, ErrNotFound
@@ -57,7 +58,6 @@ func (s *PostgresStore) GetReview(id string) (models.Review, error) {
 	}
 	return r, nil
 }
-
 
 func (s *PostgresStore) CreateDecision(d models.Decision) error {
 	_, err := s.pool.Exec(
@@ -69,11 +69,15 @@ func (s *PostgresStore) CreateDecision(d models.Decision) error {
 	return err
 }
 
-func (s *PostgresStore) ListDecisions() ([]models.Decision, error) {
+func (s *PostgresStore) ListDecisions(userID string) ([]models.Decision, error) {
 	rows, err := s.pool.Query(
 		context.Background(),
-		`SELECT id, review_id, category, sentiment, raw_output, latency_ms, created_at
-		 FROM decisions ORDER BY created_at DESC`,
+		`SELECT d.id, d.review_id, d.category, d.sentiment, d.raw_output, d.latency_ms, d.created_at
+		 FROM decisions d
+		 JOIN reviews r ON r.id = d.review_id
+		 WHERE r.user_id = $1
+		 ORDER BY d.created_at DESC`,
+		userID,
 	)
 	if err != nil {
 		return nil, err
@@ -91,7 +95,6 @@ func (s *PostgresStore) ListDecisions() ([]models.Decision, error) {
 	return decisions, rows.Err()
 }
 
-
 func (s *PostgresStore) CreateScore(sc models.Score) error {
 	_, err := s.pool.Exec(
 		context.Background(),
@@ -102,11 +105,16 @@ func (s *PostgresStore) CreateScore(sc models.Score) error {
 	return err
 }
 
-func (s *PostgresStore) ListScores() ([]models.Score, error) {
+func (s *PostgresStore) ListScores(userID string) ([]models.Score, error) {
 	rows, err := s.pool.Query(
 		context.Background(),
-		`SELECT id, decision_id, quality, COALESCE(correct_category, ''), COALESCE(scored_by::text, ''), created_at
-		 FROM scores ORDER BY created_at DESC`,
+		`SELECT sc.id, sc.decision_id, sc.quality, COALESCE(sc.correct_category, ''), COALESCE(sc.scored_by::text, ''), sc.created_at
+		 FROM scores sc
+		 JOIN decisions d ON d.id = sc.decision_id
+		 JOIN reviews r ON r.id = d.review_id
+		 WHERE r.user_id = $1
+		 ORDER BY sc.created_at DESC`,
+		userID,
 	)
 	if err != nil {
 		return nil, err
@@ -131,29 +139,42 @@ func nullIfEmpty(s string) any {
 	return s
 }
 
-
 type Metrics struct {
-	TotalReviews       int            `json:"total_reviews"`
-	TotalDecisions     int            `json:"total_decisions"`
-	TotalScores        int            `json:"total_scores"`
-	CategoryCounts     map[string]int `json:"category_counts"`
-	SentimentCounts    map[string]int `json:"sentiment_counts"`
-	AvgQuality         float64        `json:"avg_quality"`
-	AvgLatencyMs       float64        `json:"avg_latency_ms"`
-	AccuracyPct        float64        `json:"accuracy_pct"` 
+	TotalReviews    int            `json:"total_reviews"`
+	TotalDecisions  int            `json:"total_decisions"`
+	TotalScores     int            `json:"total_scores"`
+	CategoryCounts  map[string]int `json:"category_counts"`
+	SentimentCounts map[string]int `json:"sentiment_counts"`
+	AvgQuality      float64        `json:"avg_quality"`
+	AvgLatencyMs    float64        `json:"avg_latency_ms"`
+	AccuracyPct     float64        `json:"accuracy_pct"`
 }
 
-func (s *PostgresStore) GetMetrics() (Metrics, error) {
+func (s *PostgresStore) GetMetrics(userID string) (Metrics, error) {
 	ctx := context.Background()
 	var m Metrics
 	m.CategoryCounts = map[string]int{}
 	m.SentimentCounts = map[string]int{}
 
-	s.pool.QueryRow(ctx, `SELECT count(*) FROM reviews`).Scan(&m.TotalReviews)
-	s.pool.QueryRow(ctx, `SELECT count(*) FROM decisions`).Scan(&m.TotalDecisions)
-	s.pool.QueryRow(ctx, `SELECT count(*) FROM scores`).Scan(&m.TotalScores)
+	s.pool.QueryRow(ctx, `SELECT count(*) FROM reviews WHERE user_id = $1`, userID).Scan(&m.TotalReviews)
+	s.pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM decisions d
+		JOIN reviews r ON r.id = d.review_id
+		WHERE r.user_id = $1`, userID).Scan(&m.TotalDecisions)
+	s.pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM scores sc
+		JOIN decisions d ON d.id = sc.decision_id
+		JOIN reviews r ON r.id = d.review_id
+		WHERE r.user_id = $1`, userID).Scan(&m.TotalScores)
 
-	catRows, err := s.pool.Query(ctx, `SELECT category, count(*) FROM decisions GROUP BY category`)
+	catRows, err := s.pool.Query(ctx, `
+		SELECT d.category, count(*)
+		FROM decisions d
+		JOIN reviews r ON r.id = d.review_id
+		WHERE r.user_id = $1
+		GROUP BY d.category`, userID)
 	if err != nil {
 		return m, err
 	}
@@ -165,7 +186,12 @@ func (s *PostgresStore) GetMetrics() (Metrics, error) {
 	}
 	catRows.Close()
 
-	sentRows, err := s.pool.Query(ctx, `SELECT sentiment, count(*) FROM decisions GROUP BY sentiment`)
+	sentRows, err := s.pool.Query(ctx, `
+		SELECT d.sentiment, count(*)
+		FROM decisions d
+		JOIN reviews r ON r.id = d.review_id
+		WHERE r.user_id = $1
+		GROUP BY d.sentiment`, userID)
 	if err != nil {
 		return m, err
 	}
@@ -177,27 +203,52 @@ func (s *PostgresStore) GetMetrics() (Metrics, error) {
 	}
 	sentRows.Close()
 
-	s.pool.QueryRow(ctx, `SELECT COALESCE(avg(quality), 0) FROM scores`).Scan(&m.AvgQuality)
-	s.pool.QueryRow(ctx, `SELECT COALESCE(avg(latency_ms), 0) FROM decisions`).Scan(&m.AvgLatencyMs)
+	s.pool.QueryRow(ctx, `
+		SELECT COALESCE(avg(sc.quality), 0)
+		FROM scores sc
+		JOIN decisions d ON d.id = sc.decision_id
+		JOIN reviews r ON r.id = d.review_id
+		WHERE r.user_id = $1`, userID).Scan(&m.AvgQuality)
+	s.pool.QueryRow(ctx, `
+		SELECT COALESCE(avg(d.latency_ms), 0)
+		FROM decisions d
+		JOIN reviews r ON r.id = d.review_id
+		WHERE r.user_id = $1`, userID).Scan(&m.AvgLatencyMs)
 
-	
 	var total, correct int
 	s.pool.QueryRow(ctx, `
 		SELECT count(*)
 		FROM scores sc
-		WHERE sc.correct_category IS NOT NULL AND sc.correct_category <> ''
-	`).Scan(&total)
+		JOIN decisions d ON d.id = sc.decision_id
+		JOIN reviews r ON r.id = d.review_id
+		WHERE r.user_id = $1
+		  AND sc.correct_category IS NOT NULL AND sc.correct_category <> ''`, userID).Scan(&total)
 	s.pool.QueryRow(ctx, `
 		SELECT count(*)
 		FROM scores sc
 		JOIN decisions d ON d.id = sc.decision_id
-		WHERE sc.correct_category IS NOT NULL
+		JOIN reviews r ON r.id = d.review_id
+		WHERE r.user_id = $1
+		  AND sc.correct_category IS NOT NULL
 		  AND sc.correct_category <> ''
-		  AND sc.correct_category = d.category
-	`).Scan(&correct)
+		  AND sc.correct_category = d.category`, userID).Scan(&correct)
 	if total > 0 {
 		m.AccuracyPct = float64(correct) / float64(total) * 100
 	}
 
 	return m, nil
+}
+
+func (s *PostgresStore) DecisionBelongsToUser(decisionID, userID string) (bool, error) {
+	var exists bool
+	err := s.pool.QueryRow(
+		context.Background(),
+		`SELECT EXISTS (
+			SELECT 1 FROM decisions d
+			JOIN reviews r ON r.id = d.review_id
+			WHERE d.id = $1 AND r.user_id = $2
+		)`,
+		decisionID, userID,
+	).Scan(&exists)
+	return exists, err
 }

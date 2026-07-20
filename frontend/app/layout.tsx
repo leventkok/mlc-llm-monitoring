@@ -12,8 +12,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MLC LLM Monitoring",
-  description: "Raw LLM monitoring and decision scoring dashboard",
+  title: "App Review Monitoring",
+  description: "Raw LLM monitoring and decision scoring for app store reviews",
 };
 
 export default function RootLayout({

@@ -11,7 +11,6 @@ import (
 
 	"github.com/leventkok/mlc-llm-monitoring/internal/database"
 	"github.com/leventkok/mlc-llm-monitoring/internal/handlers"
-	"github.com/leventkok/mlc-llm-monitoring/internal/llm"
 	"github.com/leventkok/mlc-llm-monitoring/internal/middleware"
 	"github.com/leventkok/mlc-llm-monitoring/internal/storage"
 )
@@ -36,11 +35,9 @@ func main() {
 	store := storage.NewPostgresStore(pool)
 	configStore := storage.NewConfigStore()
 
-	analyzer := llm.NewMockAnalyzer()
-
 	authHandler := handlers.NewAuthHandler(store)
 	configHandler := handlers.NewConfigHandler(configStore)
-	reviewHandler := handlers.NewReviewHandler(store, analyzer)
+	reviewHandler := handlers.NewReviewHandler(store)
 
 	http.HandleFunc("/health", handlers.Health)
 
@@ -89,8 +86,6 @@ func main() {
 		}
 	}))
 
-	http.HandleFunc("/analyze", middleware.RequireAuth(reviewHandler.Analyze))
-
 	http.HandleFunc("/decisions", middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -124,7 +119,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	fmt.Printf("Server started on port %s\n", port)
+	fmt.Printf("app-review-monitoring API started on port %s\n", port)
 	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Fatalf("server failed: %v", err)
 	}

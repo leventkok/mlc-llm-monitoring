@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import ThemeToggle from "@/components/ThemeToggle";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await authApi.login({ username, password });
+      const res = await authApi.login({ email, password });
       await login(res.token);
       router.push("/");
     } catch (err) {
@@ -39,7 +39,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent">
-            mlc · monitor
+            app · review · monitoring
           </p>
           <h1 className="mt-3 text-2xl font-medium text-foreground">Sign in</h1>
           <p className="mt-1 text-sm text-muted">
@@ -53,12 +53,12 @@ export default function LoginPage() {
         >
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Username
+              Email
             </label>
             <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none transition focus:border-accent"
               required
             />
