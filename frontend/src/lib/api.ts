@@ -1,21 +1,43 @@
-import { AuthCredentials, AuthResponse, User } from "../types";
+import {
+  LoginCredentials,
+  RegisterCredentials,
+  AuthResponse,
+  User,
+  Review,
+  Decision,
+  Score,
+  Metrics,
+} from "../types";
 
-const API_URL = "http://localhost:8080";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    });
+  } catch {
+    throw new Error(
+      "Could not reach the API. Check NEXT_PUBLIC_API_URL and that the backend is running.",
+    );
+  }
 
-  const data = await res.json();
+  let data: { error?: string };
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error("Invalid response from server");
+  }
+
   if (!res.ok) {
     throw new Error(data.error || "Something went wrong");
   }
@@ -23,13 +45,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const authApi = {
-  register: (creds: AuthCredentials) =>
+  register: (creds: RegisterCredentials) =>
     request<User>("/auth/register", {
       method: "POST",
       body: JSON.stringify(creds),
     }),
 
-  login: (creds: AuthCredentials) =>
+  login: (creds: LoginCredentials) =>
     request<AuthResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(creds),
@@ -40,7 +62,6 @@ export const authApi = {
       headers: { Authorization: `Bearer ${token}` },
     }),
 };
-import { Review, Decision, Score, Metrics } from "@/types";
 
 export const reviewApi = {
   list: () => request<Review[]>("/reviews"),
@@ -52,12 +73,6 @@ export const reviewApi = {
     text: string;
   }) =>
     request<Review>("/reviews", { method: "POST", body: JSON.stringify(data) }),
-
-  analyze: (reviewId: string) =>
-    request<Decision>("/analyze", {
-      method: "POST",
-      body: JSON.stringify({ review_id: reviewId }),
-    }),
 
   saveDecision: (data: {
     review_id: string;

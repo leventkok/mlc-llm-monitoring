@@ -27,7 +27,7 @@ export default function Navbar() {
             href="/"
             className="font-mono text-sm font-medium tracking-tight text-foreground"
           >
-            mlc<span className="text-accent">·</span>monitor
+            app<span className="text-accent">·</span>review
           </Link>
           <div className="flex gap-1">
             {links.map((link) => {

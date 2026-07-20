@@ -6,22 +6,18 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/leventkok/mlc-llm-monitoring/internal/llm"
 	"github.com/leventkok/mlc-llm-monitoring/internal/middleware"
 	"github.com/leventkok/mlc-llm-monitoring/internal/models"
 	"github.com/leventkok/mlc-llm-monitoring/internal/storage"
 )
 
-
 type ReviewHandler struct {
-	store    *storage.PostgresStore
-	analyzer llm.Analyzer
+	store *storage.PostgresStore
 }
 
-func NewReviewHandler(store *storage.PostgresStore, analyzer llm.Analyzer) *ReviewHandler {
-	return &ReviewHandler{store: store, analyzer: analyzer}
+func NewReviewHandler(store *storage.PostgresStore) *ReviewHandler {
+	return &ReviewHandler{store: store}
 }
-
 
 type createReviewRequest struct {
 	AppName string `json:"app_name"`
@@ -32,6 +28,12 @@ type createReviewRequest struct {
 
 func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 
 	var req createReviewRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -45,6 +47,7 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 
 	review := models.Review{
 		ID:      uuid.NewString(),
+		UserID:  userID,
 		AppName: req.AppName,
 		Store:   req.Store,
 		Rating:  req.Rating,
@@ -61,69 +64,43 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 
 func (h *ReviewHandler) ListReviews(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	reviews, err := h.store.ListReviews()
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	reviews, err := h.store.ListReviews(userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not list reviews")
 		return
 	}
+	if reviews == nil {
+		reviews = []models.Review{}
+	}
 	json.NewEncoder(w).Encode(reviews)
-}
-
-
-
-type analyzeRequest struct {
-	ReviewID string `json:"review_id"`
-}
-
-
-func (h *ReviewHandler) Analyze(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	var req analyzeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON")
-		return
-	}
-
-	review, err := h.store.GetReview(req.ReviewID)
-	if err != nil {
-		writeError(w, http.StatusNotFound, "review not found")
-		return
-	}
-
-	result, err := h.analyzer.Analyze(review.Text)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "analysis failed")
-		return
-	}
-
-	decision := models.Decision{
-		ID:        uuid.NewString(),
-		ReviewID:  review.ID,
-		Category:  result.Category,
-		Sentiment: result.Sentiment,
-		RawOutput: result.RawOutput,
-		LatencyMs: result.LatencyMs,
-	}
-	if err := h.store.CreateDecision(decision); err != nil {
-		writeError(w, http.StatusInternalServerError, "could not save decision")
-		return
-	}
-
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(decision)
 }
 
 func (h *ReviewHandler) ListDecisions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	decisions, err := h.store.ListDecisions()
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	decisions, err := h.store.ListDecisions(userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not list decisions")
 		return
 	}
+	if decisions == nil {
+		decisions = []models.Decision{}
+	}
 	json.NewEncoder(w).Encode(decisions)
 }
-
 
 type createScoreRequest struct {
 	DecisionID      string `json:"decision_id"`
@@ -134,7 +111,11 @@ type createScoreRequest struct {
 func (h *ReviewHandler) CreateScore(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	userID, _ := r.Context().Value(middleware.UserIDKey).(string)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 
 	var req createScoreRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -143,6 +124,16 @@ func (h *ReviewHandler) CreateScore(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Quality < 1 || req.Quality > 5 {
 		writeError(w, http.StatusBadRequest, "quality must be between 1 and 5")
+		return
+	}
+
+	belongs, err := h.store.DecisionBelongsToUser(req.DecisionID, userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not verify decision")
+		return
+	}
+	if !belongs {
+		writeError(w, http.StatusNotFound, "decision not found")
 		return
 	}
 
@@ -164,17 +155,34 @@ func (h *ReviewHandler) CreateScore(w http.ResponseWriter, r *http.Request) {
 
 func (h *ReviewHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	scores, err := h.store.ListScores()
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	scores, err := h.store.ListScores(userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not list scores")
 		return
+	}
+	if scores == nil {
+		scores = []models.Score{}
 	}
 	json.NewEncoder(w).Encode(scores)
 }
 
 func (h *ReviewHandler) GetMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	metrics, err := h.store.GetMetrics()
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	metrics, err := h.store.GetMetrics(userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not compute metrics")
 		return
@@ -193,6 +201,12 @@ type saveDecisionRequest struct {
 func (h *ReviewHandler) SaveDecision(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	var req saveDecisionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON")
@@ -203,7 +217,7 @@ func (h *ReviewHandler) SaveDecision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.store.GetReview(req.ReviewID); err != nil {
+	if _, err := h.store.GetReviewForUser(req.ReviewID, userID); err != nil {
 		writeError(w, http.StatusNotFound, "review not found")
 		return
 	}

@@ -7,6 +7,7 @@ import { authApi } from "@/lib/api";
 import ThemeToggle from "@/components/ThemeToggle";
 
 export default function RegisterPage() {
+  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -18,7 +19,7 @@ export default function RegisterPage() {
     setError("");
     setLoading(true);
     try {
-      await authApi.register({ username, password });
+      await authApi.register({ email, username, password });
       router.push("/login");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -36,7 +37,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent">
-            mlc · monitor
+            app · review · monitoring
           </p>
           <h1 className="mt-3 text-2xl font-medium text-foreground">
             Create account
@@ -48,6 +49,19 @@ export default function RegisterPage() {
           onSubmit={handleSubmit}
           className="space-y-4 rounded-2xl border border-border bg-surface p-6"
         >
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none transition focus:border-accent"
+              required
+            />
+          </div>
+
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
               Username

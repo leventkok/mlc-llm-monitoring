@@ -22,11 +22,14 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 func (s *PostgresStore) Create(user models.User) error {
 	_, err := s.pool.Exec(
 		context.Background(),
-		`INSERT INTO users (id, username, password_hash) VALUES ($1, $2, $3)`,
-		user.ID, user.Username, user.PasswordHash,
+		`INSERT INTO users (id, email, username, password_hash) VALUES ($1, $2, $3, $4)`,
+		user.ID, user.Email, user.Username, user.PasswordHash,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
+			if isEmailConstraint(err) {
+				return ErrEmailTaken
+			}
 			return ErrUsernameTaken
 		}
 		return err
@@ -34,18 +37,22 @@ func (s *PostgresStore) Create(user models.User) error {
 	return nil
 }
 
+func (s *PostgresStore) FindByEmail(email string) (models.User, error) {
+	return s.findBy(`SELECT id, email, username, password_hash FROM users WHERE email = $1`, email)
+}
+
 func (s *PostgresStore) FindByUsername(username string) (models.User, error) {
-	return s.findBy(`SELECT id, username, password_hash FROM users WHERE username = $1`, username)
+	return s.findBy(`SELECT id, email, username, password_hash FROM users WHERE username = $1`, username)
 }
 
 func (s *PostgresStore) FindByID(id string) (models.User, error) {
-	return s.findBy(`SELECT id, username, password_hash FROM users WHERE id = $1`, id)
+	return s.findBy(`SELECT id, email, username, password_hash FROM users WHERE id = $1`, id)
 }
 
 func (s *PostgresStore) findBy(query string, arg string) (models.User, error) {
 	var u models.User
 	err := s.pool.QueryRow(context.Background(), query, arg).
-		Scan(&u.ID, &u.Username, &u.PasswordHash)
+		Scan(&u.ID, &u.Email, &u.Username, &u.PasswordHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.User{}, ErrUserNotFound
@@ -58,11 +65,14 @@ func (s *PostgresStore) findBy(query string, arg string) (models.User, error) {
 func (s *PostgresStore) Update(user models.User) error {
 	tag, err := s.pool.Exec(
 		context.Background(),
-		`UPDATE users SET username = $1, password_hash = $2 WHERE id = $3`,
-		user.Username, user.PasswordHash, user.ID,
+		`UPDATE users SET email = $1, username = $2, password_hash = $3 WHERE id = $4`,
+		user.Email, user.Username, user.PasswordHash, user.ID,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
+			if isEmailConstraint(err) {
+				return ErrEmailTaken
+			}
 			return ErrUsernameTaken
 		}
 		return err
@@ -73,11 +83,18 @@ func (s *PostgresStore) Update(user models.User) error {
 	return nil
 }
 
-
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		return pgErr.Code == "23505"
+	}
+	return false
+}
+
+func isEmailConstraint(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.ConstraintName == "users_email_key"
 	}
 	return false
 }
