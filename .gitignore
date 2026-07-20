@@ -3,3 +3,4 @@ tmp/
 .env
 server
 server.exe
+.cursor/mcp.env
