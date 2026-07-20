@@ -34,6 +34,12 @@ export default function HomePage() {
       desc: "Track decisions, score quality, watch accuracy",
       tag: "observe",
     },
+    {
+      href: "/settings",
+      title: "Settings",
+      desc: "Update password or delete your account",
+      tag: "account",
+    },
   ];
 
   return (
@@ -43,7 +49,7 @@ export default function HomePage() {
           welcome back, {user.username}
         </p>
         <h1 className="mt-3 text-3xl font-medium text-foreground">
-          Raw LLM monitoring
+          App Review Monitoring
         </h1>
         <p className="mt-2 max-w-lg text-muted">
           Classify app-store reviews with a raw language model, then observe and
@@ -51,7 +57,7 @@ export default function HomePage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {views.map((v) => (
           <Link
             key={v.href}

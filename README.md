@@ -64,7 +64,33 @@ Set environment variable:
 - Register with **email**, **username**, and **password**
 - Sign in with **email** and **password**
 - Each user sees only their own reviews, decisions, and metrics
+- Delete account from **Settings** (`/settings`)
+
+## API
+
+20 endpoints — see [docs/ENDPOINTS.md](docs/ENDPOINTS.md)
+
+| Group | Count |
+|-------|-------|
+| Common | 1 |
+| Config | 2 |
+| Auth | 9 |
+| WEB MLC-LLM | 8 |
+
+## MCP integration
+
+Deploy and review using **Render MCP**, **Vercel MCP**, and **MasterFabric Academy MCP**. See [docs/MCP.md](docs/MCP.md).
+
+Load mentor personas before reviews:
+
+- `get_mentor_persona` → **staff-engineer**
+- `get_mentor_persona` → **security-coach**
 
 ## App rename
 
-Display name is **app-review-monitoring**. To rename the Vercel project URL, update the project name in the Vercel dashboard.
+Display name is **app-review-monitoring**. To rename the Vercel URL:
+
+1. Vercel Dashboard → Project → **Settings → General**
+2. **Project Name** → `app-review-monitoring`
+3. New URL: `https://app-review-monitoring.vercel.app`
+4. Update Render `ALLOWED_ORIGINS` with the new URL

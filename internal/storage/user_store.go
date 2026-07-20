@@ -8,4 +8,5 @@ type UserStore interface {
 	FindByUsername(username string) (models.User, error)
 	FindByID(id string) (models.User, error)
 	Update(user models.User) error
+	Delete(id string) error
 }

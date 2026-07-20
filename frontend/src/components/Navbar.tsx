@@ -17,6 +17,7 @@ export default function Navbar() {
     { href: "/", label: "Home" },
     { href: "/dashboard", label: "Dashboard" },
     { href: "/monitoring", label: "Monitoring" },
+    { href: "/settings", label: "Settings" },
   ];
 
   return (

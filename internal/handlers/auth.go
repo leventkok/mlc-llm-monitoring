@@ -304,6 +304,30 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *AuthHandler) DeleteMe(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	if err := h.store.Delete(userID); err != nil {
+		if err == storage.ErrUserNotFound {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "could not delete account"})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "account deleted"})
+}
+
 func (h *AuthHandler) Validate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
