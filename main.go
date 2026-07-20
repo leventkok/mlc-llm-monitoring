@@ -119,6 +119,13 @@ func main() {
 	http.HandleFunc("/metrics", middleware.RequireAuth(reviewHandler.GetMetrics))
 
 	handler := middleware.CORS(http.DefaultServeMux)
-	fmt.Println("Server started: http://localhost:8080")
-	http.ListenAndServe(":8080", handler)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	fmt.Printf("Server started on port %s\n", port)
+	if err := http.ListenAndServe(":"+port, handler); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
 }
