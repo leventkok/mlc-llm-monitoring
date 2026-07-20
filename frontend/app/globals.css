@@ -1,26 +1,46 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode (next-themes toggles .dark on <html>) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Light theme tokens */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f4f4f5;
+  --border: #e6e6ea;
+  --foreground: #18181b;
+  --muted: #71717a;
+  --accent: #6d4aff;
+  --accent-fg: #ffffff;
 }
 
+/* Dark theme tokens */
+.dark {
+  --background: #0f0f12;
+  --surface: #17171b;
+  --surface-2: #1e1e24;
+  --border: #27272e;
+  --foreground: #ececee;
+  --muted: #a1a1aa;
+  --accent: #8b7bff;
+  --accent-fg: #17171b;
+}
+
+/* Expose tokens as Tailwind color utilities (bg-surface, text-muted, etc.) */
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }

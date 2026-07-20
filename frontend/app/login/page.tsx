@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { authApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
   const router = useRouter();
   const { login } = useAuth();
 
@@ -18,7 +19,6 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
       const res = await authApi.login({ username, password });
       await login(res.token);
@@ -31,53 +31,72 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-md">
-        <h1 className="mb-6 text-2xl font-bold text-gray-900">Sign In</h1>
+    <div className="relative flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 text-center">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent">
+            mlc · monitor
+          </p>
+          <h1 className="mt-3 text-2xl font-medium text-foreground">Sign in</h1>
+          <p className="mt-1 text-sm text-muted">
+            Raw LLM monitoring &amp; decision scoring
+          </p>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4 rounded-2xl border border-border bg-surface p-6"
+        >
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
               Username
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none transition focus:border-accent"
               required
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
               Password
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none transition focus:border-accent"
               required
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
+              {error}
+            </p>
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="w-full rounded-lg bg-accent py-2.5 font-medium text-accent-fg transition hover:opacity-90 disabled:opacity-50"
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-gray-600">
+        <p className="mt-4 text-center text-sm text-muted">
           Don&apos;t have an account?{" "}
-          <a href="/register" className="text-blue-600 hover:underline">
-            Sign up
-          </a>
+          <Link href="/register" className="text-accent hover:underline">
+            Create one
+          </Link>
         </p>
       </div>
     </div>

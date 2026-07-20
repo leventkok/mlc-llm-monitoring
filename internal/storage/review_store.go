@@ -130,3 +130,74 @@ func nullIfEmpty(s string) any {
 	}
 	return s
 }
+
+
+type Metrics struct {
+	TotalReviews       int            `json:"total_reviews"`
+	TotalDecisions     int            `json:"total_decisions"`
+	TotalScores        int            `json:"total_scores"`
+	CategoryCounts     map[string]int `json:"category_counts"`
+	SentimentCounts    map[string]int `json:"sentiment_counts"`
+	AvgQuality         float64        `json:"avg_quality"`
+	AvgLatencyMs       float64        `json:"avg_latency_ms"`
+	AccuracyPct        float64        `json:"accuracy_pct"` 
+}
+
+func (s *PostgresStore) GetMetrics() (Metrics, error) {
+	ctx := context.Background()
+	var m Metrics
+	m.CategoryCounts = map[string]int{}
+	m.SentimentCounts = map[string]int{}
+
+	s.pool.QueryRow(ctx, `SELECT count(*) FROM reviews`).Scan(&m.TotalReviews)
+	s.pool.QueryRow(ctx, `SELECT count(*) FROM decisions`).Scan(&m.TotalDecisions)
+	s.pool.QueryRow(ctx, `SELECT count(*) FROM scores`).Scan(&m.TotalScores)
+
+	catRows, err := s.pool.Query(ctx, `SELECT category, count(*) FROM decisions GROUP BY category`)
+	if err != nil {
+		return m, err
+	}
+	for catRows.Next() {
+		var cat string
+		var n int
+		catRows.Scan(&cat, &n)
+		m.CategoryCounts[cat] = n
+	}
+	catRows.Close()
+
+	sentRows, err := s.pool.Query(ctx, `SELECT sentiment, count(*) FROM decisions GROUP BY sentiment`)
+	if err != nil {
+		return m, err
+	}
+	for sentRows.Next() {
+		var sent string
+		var n int
+		sentRows.Scan(&sent, &n)
+		m.SentimentCounts[sent] = n
+	}
+	sentRows.Close()
+
+	s.pool.QueryRow(ctx, `SELECT COALESCE(avg(quality), 0) FROM scores`).Scan(&m.AvgQuality)
+	s.pool.QueryRow(ctx, `SELECT COALESCE(avg(latency_ms), 0) FROM decisions`).Scan(&m.AvgLatencyMs)
+
+	
+	var total, correct int
+	s.pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM scores sc
+		WHERE sc.correct_category IS NOT NULL AND sc.correct_category <> ''
+	`).Scan(&total)
+	s.pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM scores sc
+		JOIN decisions d ON d.id = sc.decision_id
+		WHERE sc.correct_category IS NOT NULL
+		  AND sc.correct_category <> ''
+		  AND sc.correct_category = d.category
+	`).Scan(&correct)
+	if total > 0 {
+		m.AccuracyPct = float64(correct) / float64(total) * 100
+	}
+
+	return m, nil
+}

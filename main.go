@@ -105,6 +105,7 @@ func main() {
 			w.Write([]byte(`{"error":"unsupported method"}`))
 		}
 	}))
+	http.HandleFunc("/metrics", middleware.RequireAuth(reviewHandler.GetMetrics))
 
 	handler := middleware.CORS(http.DefaultServeMux)
 	fmt.Println("Server started: http://localhost:8080")

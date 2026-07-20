@@ -171,3 +171,13 @@ func (h *ReviewHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(scores)
 }
+
+func (h *ReviewHandler) GetMetrics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	metrics, err := h.store.GetMetrics()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not compute metrics")
+		return
+	}
+	json.NewEncoder(w).Encode(metrics)
+}
