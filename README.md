@@ -31,6 +31,20 @@ npm run dev
 
 ### Render (backend)
 
+**Build Command** (Settings → Build & Deploy):
+
+```
+go build -tags netgo -ldflags '-s -w' -o server .
+```
+
+**Start Command**:
+
+```
+./server
+```
+
+Build ve Start komutları **aynı dosya adını** kullanmalı. Render varsayılanı `-o app` / `./app` üretir; Start `./server` ise build de `-o server` olmalı.
+
 Set environment variables:
 
 - `DATABASE_URL` — PostgreSQL connection string
