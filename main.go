@@ -1,16 +1,38 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 
+	"github.com/joho/godotenv"
+
+	"github.com/leventkok/mlc-llm-monitoring/internal/database"
 	"github.com/leventkok/mlc-llm-monitoring/internal/handlers"
 	"github.com/leventkok/mlc-llm-monitoring/internal/middleware"
 	"github.com/leventkok/mlc-llm-monitoring/internal/storage"
 )
 
 func main() {
-	store := storage.NewMemoryStore()
+	_ = godotenv.Load()
+
+	ctx := context.Background()
+	dbURL := os.Getenv("DATABASE_URL")
+	pool, err := database.Connect(ctx, dbURL)
+	if err != nil {
+		log.Fatalf("database connection failed: %v", err)
+	}
+	defer pool.Close()
+	fmt.Println("Connected to PostgreSQL")
+
+	if err := database.Migrate(ctx, pool); err != nil {
+		log.Fatalf("migration failed: %v", err)
+	}
+	fmt.Println("Database schema ready")
+
+	store := storage.NewPostgresStore(pool)
 	configStore := storage.NewConfigStore()
 
 	authHandler := handlers.NewAuthHandler(store)
@@ -31,6 +53,7 @@ func main() {
 		}
 	})
 
+	
 	http.HandleFunc("/auth/register", authHandler.Register)
 	http.HandleFunc("/auth/login", authHandler.Login)
 	http.HandleFunc("/auth/me", middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +73,7 @@ func main() {
 	http.HandleFunc("/auth/validate", middleware.RequireAuth(authHandler.Validate))
 	http.HandleFunc("/auth/change-password", middleware.RequireAuth(authHandler.ChangePassword))
 
+	handler := middleware.CORS(http.DefaultServeMux)
 	fmt.Println("Server started: http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":8080", handler)
 }
