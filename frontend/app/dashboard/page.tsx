@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { reviewApi } from "@/lib/api";
+import { analyzeReview } from "@/lib/llm";
 import { Review, Decision } from "@/types";
 import { categoryBadge, sentimentBadge } from "@/lib/badges";
 
@@ -16,8 +17,9 @@ export default function DashboardPage() {
   const [analyzing, setAnalyzing] = useState<string | null>(null);
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
   const [error, setError] = useState("");
+  const [modelProgress, setModelProgress] = useState(0);
+  const [modelReady, setModelReady] = useState(false);
 
-  // Load existing reviews on mount
   useEffect(() => {
     reviewApi
       .list()
@@ -46,11 +48,26 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleAnalyze(reviewId: string) {
-    setAnalyzing(reviewId);
+  async function handleAnalyze(review: Review) {
+    setAnalyzing(review.id);
+    setError("");
     try {
-      const decision = await reviewApi.analyze(reviewId);
-      setDecisions((prev) => ({ ...prev, [reviewId]: decision }));
+      // 1) Run Gemma in the browser
+      const result = await analyzeReview(review.text, (pct) => {
+        setModelProgress(pct);
+        if (pct >= 1) setModelReady(true);
+      });
+      setModelReady(true);
+
+      // 2) Persist the decision to the backend
+      const decision = await reviewApi.saveDecision({
+        review_id: review.id,
+        category: result.category,
+        sentiment: result.sentiment,
+        raw_output: result.rawOutput,
+        latency_ms: result.latencyMs,
+      });
+      setDecisions((prev) => ({ ...prev, [review.id]: decision }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
@@ -69,9 +86,27 @@ export default function DashboardPage() {
             Analyze reviews
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Add an app-store review and let the raw model classify it.
+            Add a review and let Gemma classify it — running in your browser.
           </p>
         </div>
+
+        {/* Model loading banner (only while downloading) */}
+        {analyzing && !modelReady && (
+          <div className="mb-6 rounded-xl border border-accent/30 bg-accent/5 p-4">
+            <p className="font-mono text-xs text-accent">
+              loading gemma… {Math.round(modelProgress * 100)}%
+            </p>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
+              <div
+                className="h-full rounded-full bg-accent transition-all"
+                style={{ width: `${modelProgress * 100}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              First run downloads the model (one time, then cached).
+            </p>
+          </div>
+        )}
 
         {/* Add review form */}
         <form
@@ -174,15 +209,14 @@ export default function DashboardPage() {
                     <p className="text-sm text-foreground">{review.text}</p>
                   </div>
                   <button
-                    onClick={() => handleAnalyze(review.id)}
-                    disabled={analyzing === review.id}
+                    onClick={() => handleAnalyze(review)}
+                    disabled={analyzing !== null}
                     className="shrink-0 rounded-lg border border-accent px-3 py-1.5 font-mono text-xs text-accent transition hover:bg-accent hover:text-accent-fg disabled:opacity-50"
                   >
                     {analyzing === review.id ? "analyzing…" : "analyze"}
                   </button>
                 </div>
 
-                {/* Verdict card — the signature element */}
                 {decision && (
                   <div className="mt-4 rounded-xl border border-border bg-background p-4">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -203,7 +237,7 @@ export default function DashboardPage() {
                         {decision.latency_ms}ms
                       </span>
                     </div>
-                    <p className="font-mono text-xs text-muted">
+                    <p className="break-words font-mono text-xs text-muted">
                       {decision.raw_output}
                     </p>
                   </div>
