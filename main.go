@@ -62,6 +62,8 @@ func main() {
 			authHandler.Me(w, r)
 		case http.MethodPatch:
 			authHandler.UpdateMe(w, r)
+		case http.MethodDelete:
+			authHandler.DeleteMe(w, r)
 		default:
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -72,6 +74,8 @@ func main() {
 	http.HandleFunc("/auth/refresh", middleware.RequireAuth(authHandler.Refresh))
 	http.HandleFunc("/auth/validate", middleware.RequireAuth(authHandler.Validate))
 	http.HandleFunc("/auth/change-password", middleware.RequireAuth(authHandler.ChangePassword))
+
+	http.HandleFunc("GET /reviews/{id}", middleware.RequireAuth(reviewHandler.GetReview))
 
 	http.HandleFunc("/reviews", middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

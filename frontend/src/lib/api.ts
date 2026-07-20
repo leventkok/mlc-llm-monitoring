@@ -61,10 +61,24 @@ export const authApi = {
     request<User>("/auth/me", {
       headers: { Authorization: `Bearer ${token}` },
     }),
+
+  changePassword: (oldPassword: string, newPassword: string) =>
+    request<{ message: string }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({
+        old_password: oldPassword,
+        new_password: newPassword,
+      }),
+    }),
+
+  deleteAccount: () =>
+    request<{ message: string }>("/auth/me", { method: "DELETE" }),
 };
 
 export const reviewApi = {
   list: () => request<Review[]>("/reviews"),
+
+  get: (id: string) => request<Review>(`/reviews/${id}`),
 
   create: (data: {
     app_name: string;

@@ -62,6 +62,21 @@ func (s *PostgresStore) findBy(query string, arg string) (models.User, error) {
 	return u, nil
 }
 
+func (s *PostgresStore) Delete(id string) error {
+	ctx := context.Background()
+	if _, err := s.pool.Exec(ctx, `UPDATE scores SET scored_by = NULL WHERE scored_by = $1`, id); err != nil {
+		return err
+	}
+	tag, err := s.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
 func (s *PostgresStore) Update(user models.User) error {
 	tag, err := s.pool.Exec(
 		context.Background(),

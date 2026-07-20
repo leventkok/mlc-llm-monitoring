@@ -62,6 +62,30 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(review)
 }
 
+func (h *ReviewHandler) GetReview(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok || userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "review id required")
+		return
+	}
+
+	review, err := h.store.GetReviewForUser(id, userID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "review not found")
+		return
+	}
+
+	json.NewEncoder(w).Encode(review)
+}
+
 func (h *ReviewHandler) ListReviews(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
