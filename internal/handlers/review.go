@@ -181,3 +181,46 @@ func (h *ReviewHandler) GetMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(metrics)
 }
+
+type saveDecisionRequest struct {
+	ReviewID  string `json:"review_id"`
+	Category  string `json:"category"`
+	Sentiment string `json:"sentiment"`
+	RawOutput string `json:"raw_output"`
+	LatencyMs int    `json:"latency_ms"`
+}
+
+func (h *ReviewHandler) SaveDecision(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var req saveDecisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if req.ReviewID == "" || req.Category == "" || req.Sentiment == "" {
+		writeError(w, http.StatusBadRequest, "review_id, category and sentiment are required")
+		return
+	}
+
+	if _, err := h.store.GetReview(req.ReviewID); err != nil {
+		writeError(w, http.StatusNotFound, "review not found")
+		return
+	}
+
+	decision := models.Decision{
+		ID:        uuid.NewString(),
+		ReviewID:  req.ReviewID,
+		Category:  req.Category,
+		Sentiment: req.Sentiment,
+		RawOutput: req.RawOutput,
+		LatencyMs: req.LatencyMs,
+	}
+	if err := h.store.CreateDecision(decision); err != nil {
+		writeError(w, http.StatusInternalServerError, "could not save decision")
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(decision)
+}

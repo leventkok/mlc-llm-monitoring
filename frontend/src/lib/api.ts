@@ -59,6 +59,18 @@ export const reviewApi = {
       body: JSON.stringify({ review_id: reviewId }),
     }),
 
+  saveDecision: (data: {
+    review_id: string;
+    category: string;
+    sentiment: string;
+    raw_output: string;
+    latency_ms: number;
+  }) =>
+    request<Decision>("/decisions", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   decisions: () => request<Decision[]>("/decisions"),
 
   scores: () => request<Score[]>("/scores"),

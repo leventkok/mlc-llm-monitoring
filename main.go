@@ -91,7 +91,18 @@ func main() {
 
 	http.HandleFunc("/analyze", middleware.RequireAuth(reviewHandler.Analyze))
 
-	http.HandleFunc("/decisions", middleware.RequireAuth(reviewHandler.ListDecisions))
+	http.HandleFunc("/decisions", middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			reviewHandler.ListDecisions(w, r)
+		case http.MethodPost:
+			reviewHandler.SaveDecision(w, r)
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte(`{"error":"unsupported method"}`))
+		}
+	}))
 
 	http.HandleFunc("/scores", middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
