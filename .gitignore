@@ -1,3 +1,5 @@
 tmp/
 *.exe
 .env
+server
+server.exe

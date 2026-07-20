@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: app-review-monitoring-api
+    runtime: go
+    plan: free
+    branch: main
+    buildCommand: go build -tags netgo -ldflags '-s -w' -o server .
+    startCommand: ./server
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: https://mlc-llm-monitoring.vercel.app
