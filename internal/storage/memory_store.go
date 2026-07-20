@@ -10,6 +10,7 @@ import (
 var (
 	ErrUserNotFound      = errors.New("User is not found")
 	ErrUsernameTaken     = errors.New("This username is already taken")
+	ErrNotFound = errors.New("not found")
 )
 
 type MemoryStore struct {

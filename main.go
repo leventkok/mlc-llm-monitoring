@@ -11,6 +11,7 @@ import (
 
 	"github.com/leventkok/mlc-llm-monitoring/internal/database"
 	"github.com/leventkok/mlc-llm-monitoring/internal/handlers"
+	"github.com/leventkok/mlc-llm-monitoring/internal/llm"
 	"github.com/leventkok/mlc-llm-monitoring/internal/middleware"
 	"github.com/leventkok/mlc-llm-monitoring/internal/storage"
 )
@@ -35,8 +36,11 @@ func main() {
 	store := storage.NewPostgresStore(pool)
 	configStore := storage.NewConfigStore()
 
+	analyzer := llm.NewMockAnalyzer()
+
 	authHandler := handlers.NewAuthHandler(store)
 	configHandler := handlers.NewConfigHandler(configStore)
+	reviewHandler := handlers.NewReviewHandler(store, analyzer)
 
 	http.HandleFunc("/health", handlers.Health)
 
@@ -53,7 +57,6 @@ func main() {
 		}
 	})
 
-	
 	http.HandleFunc("/auth/register", authHandler.Register)
 	http.HandleFunc("/auth/login", authHandler.Login)
 	http.HandleFunc("/auth/me", middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +75,36 @@ func main() {
 	http.HandleFunc("/auth/refresh", middleware.RequireAuth(authHandler.Refresh))
 	http.HandleFunc("/auth/validate", middleware.RequireAuth(authHandler.Validate))
 	http.HandleFunc("/auth/change-password", middleware.RequireAuth(authHandler.ChangePassword))
+
+	http.HandleFunc("/reviews", middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			reviewHandler.ListReviews(w, r)
+		case http.MethodPost:
+			reviewHandler.CreateReview(w, r)
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte(`{"error":"unsupported method"}`))
+		}
+	}))
+
+	http.HandleFunc("/analyze", middleware.RequireAuth(reviewHandler.Analyze))
+
+	http.HandleFunc("/decisions", middleware.RequireAuth(reviewHandler.ListDecisions))
+
+	http.HandleFunc("/scores", middleware.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			reviewHandler.ListScores(w, r)
+		case http.MethodPost:
+			reviewHandler.CreateScore(w, r)
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte(`{"error":"unsupported method"}`))
+		}
+	}))
 
 	handler := middleware.CORS(http.DefaultServeMux)
 	fmt.Println("Server started: http://localhost:8080")
