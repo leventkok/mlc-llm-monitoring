@@ -3,20 +3,22 @@ import { AuthCredentials, AuthResponse, User } from "../types";
 const API_URL = "http://localhost:8080";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });
 
   const data = await res.json();
-
   if (!res.ok) {
-    throw new Error(data.error || "Bir hata olustu");
+    throw new Error(data.error || "Something went wrong");
   }
-
   return data as T;
 }
 
@@ -37,4 +39,36 @@ export const authApi = {
     request<User>("/auth/me", {
       headers: { Authorization: `Bearer ${token}` },
     }),
+};
+import { Review, Decision, Score, Metrics } from "@/types";
+
+export const reviewApi = {
+  list: () => request<Review[]>("/reviews"),
+
+  create: (data: {
+    app_name: string;
+    store: string;
+    rating: number;
+    text: string;
+  }) =>
+    request<Review>("/reviews", { method: "POST", body: JSON.stringify(data) }),
+
+  analyze: (reviewId: string) =>
+    request<Decision>("/analyze", {
+      method: "POST",
+      body: JSON.stringify({ review_id: reviewId }),
+    }),
+
+  decisions: () => request<Decision[]>("/decisions"),
+
+  scores: () => request<Score[]>("/scores"),
+
+  score: (data: {
+    decision_id: string;
+    quality: number;
+    correct_category?: string;
+  }) =>
+    request<Score>("/scores", { method: "POST", body: JSON.stringify(data) }),
+
+  metrics: () => request<Metrics>("/metrics"),
 };
