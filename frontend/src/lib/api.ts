@@ -1,7 +1,6 @@
 import {
   LoginCredentials,
   RegisterCredentials,
-  AuthResponse,
   User,
   Review,
   Decision,
@@ -12,16 +11,13 @@ import {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       ...options,
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
     });
@@ -44,6 +40,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
+const listQuery = "limit=500&offset=0";
+
 export const authApi = {
   register: (creds: RegisterCredentials) =>
     request<User>("/auth/register", {
@@ -52,15 +50,14 @@ export const authApi = {
     }),
 
   login: (creds: LoginCredentials) =>
-    request<AuthResponse>("/auth/login", {
+    request<{ message: string }>("/auth/login", {
       method: "POST",
       body: JSON.stringify(creds),
     }),
 
-  me: (token: string) =>
-    request<User>("/auth/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    }),
+  me: () => request<User>("/auth/me"),
+
+  logout: () => request<{ message: string }>("/auth/logout"),
 
   changePassword: (oldPassword: string, newPassword: string) =>
     request<{ message: string }>("/auth/change-password", {
@@ -76,7 +73,7 @@ export const authApi = {
 };
 
 export const reviewApi = {
-  list: () => request<Review[]>("/reviews"),
+  list: () => request<Review[]>(`/reviews?${listQuery}`),
 
   get: (id: string) => request<Review>(`/reviews/${id}`),
 
@@ -100,9 +97,9 @@ export const reviewApi = {
       body: JSON.stringify(data),
     }),
 
-  decisions: () => request<Decision[]>("/decisions"),
+  decisions: () => request<Decision[]>(`/decisions?${listQuery}`),
 
-  scores: () => request<Score[]>("/scores"),
+  scores: () => request<Score[]>(`/scores?${listQuery}`),
 
   score: (data: {
     decision_id: string;

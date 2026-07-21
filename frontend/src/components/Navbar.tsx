@@ -54,7 +54,7 @@ export default function Navbar() {
           <span className="font-mono text-xs text-muted">{user.username}</span>
           <ThemeToggle />
           <button
-            onClick={logout}
+            onClick={() => void logout()}
             className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted transition hover:text-foreground"
           >
             Sign out

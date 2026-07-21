@@ -11,5 +11,7 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: GO_ENV
+        value: production
       - key: ALLOWED_ORIGINS
         value: https://mlc-llm-monitoring.vercel.app

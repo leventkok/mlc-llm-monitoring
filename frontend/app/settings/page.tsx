@@ -24,9 +24,11 @@ export default function SettingsPage() {
     setPasswordLoading(true);
     try {
       await authApi.changePassword(oldPassword, newPassword);
-      setPasswordMsg("Password updated.");
+      setPasswordMsg("Password updated. Please sign in again.");
       setOldPassword("");
       setNewPassword("");
+      await logout();
+      router.push("/login");
     } catch (err) {
       setPasswordError(err instanceof Error ? err.message : "Could not update password");
     } finally {
@@ -44,7 +46,7 @@ export default function SettingsPage() {
     setDeleteLoading(true);
     try {
       await authApi.deleteAccount();
-      logout();
+      await logout();
       router.push("/register");
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "Could not delete account");
@@ -111,6 +113,7 @@ export default function SettingsPage() {
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+              minLength={12}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none transition focus:border-accent"
               required
             />

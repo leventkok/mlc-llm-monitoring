@@ -19,9 +19,8 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 	return &PostgresStore{pool: pool}
 }
 
-func (s *PostgresStore) Create(user models.User) error {
-	_, err := s.pool.Exec(
-		context.Background(),
+func (s *PostgresStore) Create(ctx context.Context, user models.User) error {
+	_, err := s.pool.Exec(ctx,
 		`INSERT INTO users (id, email, username, password_hash) VALUES ($1, $2, $3, $4)`,
 		user.ID, user.Email, user.Username, user.PasswordHash,
 	)
@@ -37,21 +36,21 @@ func (s *PostgresStore) Create(user models.User) error {
 	return nil
 }
 
-func (s *PostgresStore) FindByEmail(email string) (models.User, error) {
-	return s.findBy(`SELECT id, email, username, password_hash FROM users WHERE email = $1`, email)
+func (s *PostgresStore) FindByEmail(ctx context.Context, email string) (models.User, error) {
+	return s.findBy(ctx, `SELECT id, email, username, password_hash FROM users WHERE email = $1`, email)
 }
 
-func (s *PostgresStore) FindByUsername(username string) (models.User, error) {
-	return s.findBy(`SELECT id, email, username, password_hash FROM users WHERE username = $1`, username)
+func (s *PostgresStore) FindByUsername(ctx context.Context, username string) (models.User, error) {
+	return s.findBy(ctx, `SELECT id, email, username, password_hash FROM users WHERE username = $1`, username)
 }
 
-func (s *PostgresStore) FindByID(id string) (models.User, error) {
-	return s.findBy(`SELECT id, email, username, password_hash FROM users WHERE id = $1`, id)
+func (s *PostgresStore) FindByID(ctx context.Context, id string) (models.User, error) {
+	return s.findBy(ctx, `SELECT id, email, username, password_hash FROM users WHERE id = $1`, id)
 }
 
-func (s *PostgresStore) findBy(query string, arg string) (models.User, error) {
+func (s *PostgresStore) findBy(ctx context.Context, query string, arg string) (models.User, error) {
 	var u models.User
-	err := s.pool.QueryRow(context.Background(), query, arg).
+	err := s.pool.QueryRow(ctx, query, arg).
 		Scan(&u.ID, &u.Email, &u.Username, &u.PasswordHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -62,24 +61,28 @@ func (s *PostgresStore) findBy(query string, arg string) (models.User, error) {
 	return u, nil
 }
 
-func (s *PostgresStore) Delete(id string) error {
-	ctx := context.Background()
-	if _, err := s.pool.Exec(ctx, `UPDATE scores SET scored_by = NULL WHERE scored_by = $1`, id); err != nil {
+func (s *PostgresStore) Delete(ctx context.Context, id string) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
 		return err
 	}
-	tag, err := s.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `UPDATE scores SET scored_by = NULL WHERE scored_by = $1`, id); err != nil {
+		return err
+	}
+	tag, err := tx.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrUserNotFound
 	}
-	return nil
+	return tx.Commit(ctx)
 }
 
-func (s *PostgresStore) Update(user models.User) error {
-	tag, err := s.pool.Exec(
-		context.Background(),
+func (s *PostgresStore) Update(ctx context.Context, user models.User) error {
+	tag, err := s.pool.Exec(ctx,
 		`UPDATE users SET email = $1, username = $2, password_hash = $3 WHERE id = $4`,
 		user.Email, user.Username, user.PasswordHash, user.ID,
 	)

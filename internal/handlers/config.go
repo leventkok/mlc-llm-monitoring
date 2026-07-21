@@ -17,26 +17,21 @@ func NewConfigHandler(store *storage.ConfigStore) *ConfigHandler {
 }
 
 func (h *ConfigHandler) Get(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(h.store.Get())
+	writeJSON(w, http.StatusOK, h.store.Get())
 }
 
 func (h *ConfigHandler) Update(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	var req models.Config
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 
 	if req.AppName == "" || req.Model == "" || req.Version == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "app_name, model and version are required"})
+		writeError(w, http.StatusBadRequest, "app_name, model and version are required")
 		return
 	}
 
 	updated := h.store.Update(req)
-	json.NewEncoder(w).Encode(updated)
+	writeJSON(w, http.StatusOK, updated)
 }

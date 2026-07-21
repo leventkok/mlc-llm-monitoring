@@ -50,6 +50,11 @@ var migrations = []string{
 	`CREATE UNIQUE INDEX IF NOT EXISTS users_email_key ON users (email)`,
 	`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE CASCADE`,
 	`CREATE INDEX IF NOT EXISTS reviews_user_id_idx ON reviews (user_id)`,
+	`CREATE INDEX IF NOT EXISTS decisions_review_id_idx ON decisions (review_id)`,
+	`CREATE INDEX IF NOT EXISTS scores_decision_id_idx ON scores (decision_id)`,
+	`CREATE INDEX IF NOT EXISTS scores_scored_by_idx ON scores (scored_by)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS scores_one_per_decision_idx ON scores (decision_id)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS decisions_one_per_review_idx ON decisions (review_id)`,
 }
 
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {

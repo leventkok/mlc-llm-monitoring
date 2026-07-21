@@ -20,8 +20,8 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await authApi.login({ email, password });
-      await login(res.token);
+      await authApi.login({ email, password });
+      await login();
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

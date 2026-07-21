@@ -3,8 +3,10 @@ package storage
 import "errors"
 
 var (
-	ErrUserNotFound  = errors.New("User is not found")
-	ErrUsernameTaken = errors.New("This username is already taken")
-	ErrEmailTaken    = errors.New("This email is already taken")
-	ErrNotFound      = errors.New("not found")
+	ErrUserNotFound   = errors.New("user not found")
+	ErrUsernameTaken  = errors.New("username already taken")
+	ErrEmailTaken     = errors.New("email already taken")
+	ErrNotFound       = errors.New("not found")
+	ErrAlreadyScored  = errors.New("decision already scored")
+	ErrDuplicateDecision = errors.New("decision already exists for review")
 )

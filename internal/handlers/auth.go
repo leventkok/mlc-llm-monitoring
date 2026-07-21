@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -10,7 +12,7 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/internal/middleware"
 	"github.com/leventkok/mlc-llm-monitoring/internal/models"
 	"github.com/leventkok/mlc-llm-monitoring/internal/storage"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/leventkok/mlc-llm-monitoring/internal/validate"
 )
 
 type AuthHandler struct {
@@ -27,40 +29,51 @@ type registerRequest struct {
 	Password string `json:"password"`
 }
 
-func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+type userResponse struct {
+	ID       string `json:"id"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
+}
 
+type messageResponse struct {
+	Message string `json:"message"`
+}
+
+type validateResponse struct {
+	Valid  bool   `json:"valid"`
+	UserID string `json:"user_id"`
+}
+
+func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{"error": "only POST"})
+		writeError(w, http.StatusMethodNotAllowed, "only POST")
 		return
 	}
 
 	var req registerRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+	if err := decodeJSON(w, r, &req); err != nil {
 		return
 	}
 
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 	req.Username = strings.TrimSpace(req.Username)
 
-	if req.Email == "" || req.Username == "" || req.Password == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "email, username and password are required"})
+	if err := validate.Email(req.Email); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if !strings.Contains(req.Email, "@") {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid email address"})
+	if err := validate.Username(req.Username); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := auth.ValidatePassword(req.Password); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "password could not be processed"})
+		writeError(w, http.StatusInternalServerError, "password could not be processed")
 		return
 	}
 
@@ -71,27 +84,19 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		PasswordHash: string(hash),
 	}
 
-	if err := h.store.Create(user); err != nil {
-		if err == storage.ErrEmailTaken {
-			w.WriteHeader(http.StatusConflict)
-			json.NewEncoder(w).Encode(map[string]string{"error": "this email is already registered"})
+	ctx := r.Context()
+	if err := h.store.Create(ctx, user); err != nil {
+		if errors.Is(err, storage.ErrEmailTaken) || errors.Is(err, storage.ErrUsernameTaken) {
+			writeError(w, http.StatusConflict, "registration failed; check email and username")
 			return
 		}
-		if err == storage.ErrUsernameTaken {
-			w.WriteHeader(http.StatusConflict)
-			json.NewEncoder(w).Encode(map[string]string{"error": "this username is already taken"})
-			return
-		}
-		w.WriteHeader(http.StatusConflict)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		log.Printf("register error: %v", err)
+		writeError(w, http.StatusInternalServerError, "registration failed")
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
-		"id":       user.ID,
-		"email":    user.Email,
-		"username": user.Username,
+	writeJSON(w, http.StatusCreated, userResponse{
+		ID: user.ID, Email: user.Email, Username: user.Username,
 	})
 }
 
@@ -101,97 +106,79 @@ type loginRequest struct {
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{"error": "only POST"})
+		writeError(w, http.StatusMethodNotAllowed, "only POST")
 		return
 	}
 
 	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+	if err := decodeJSON(w, r, &req); err != nil {
 		return
 	}
 
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	ctx := r.Context()
 
-	user, err := h.store.FindByEmail(req.Email)
+	user, err := h.store.FindByEmail(ctx, req.Email)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "incorrect email or password"})
+		_ = auth.CheckPassword(string(auth.DummyHash), req.Password)
+		writeError(w, http.StatusUnauthorized, "incorrect email or password")
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "incorrect email or password"})
+	if err := auth.CheckPassword(user.PasswordHash, req.Password); err != nil {
+		writeError(w, http.StatusUnauthorized, "incorrect email or password")
 		return
 	}
 
 	token, err := auth.GenerateToken(user.ID)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "token could not be generated"})
+		writeError(w, http.StatusInternalServerError, "token could not be generated")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
-		"token": token,
-	})
+	middleware.SetSessionCookie(w, token)
+	writeJSON(w, http.StatusOK, messageResponse{Message: "signed in"})
 }
 
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok || userID == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	user, err := h.store.FindByID(userID)
+	user, err := h.store.FindByID(r.Context(), userID)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
+		writeError(w, http.StatusNotFound, "user not found")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
-		"id":       user.ID,
-		"email":    user.Email,
-		"username": user.Username,
+	writeJSON(w, http.StatusOK, userResponse{
+		ID: user.ID, Email: user.Email, Username: user.Username,
 	})
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Logged out, please delete token on the client side",
-	})
+	middleware.ClearSessionCookie(w)
+	writeJSON(w, http.StatusOK, messageResponse{Message: "signed out"})
 }
 
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok || userID == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	token, err := auth.GenerateToken(userID)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "token could not be generated"})
+		writeError(w, http.StatusInternalServerError, "token could not be generated")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"token": token})
+	middleware.SetSessionCookie(w, token)
+	writeJSON(w, http.StatusOK, messageResponse{Message: "token refreshed"})
 }
 
 type changePasswordRequest struct {
@@ -200,55 +187,47 @@ type changePasswordRequest struct {
 }
 
 func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok || userID == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	var req changePasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+	if err := decodeJSON(w, r, &req); err != nil {
 		return
 	}
-	if req.NewPassword == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "new password cannot be empty"})
+	if err := auth.ValidatePassword(req.NewPassword); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	user, err := h.store.FindByID(userID)
+	ctx := r.Context()
+	user, err := h.store.FindByID(ctx, userID)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
+		writeError(w, http.StatusNotFound, "user not found")
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.OldPassword)); err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "old password is incorrect"})
+	if err := auth.CheckPassword(user.PasswordHash, req.OldPassword); err != nil {
+		writeError(w, http.StatusUnauthorized, "could not change password")
 		return
 	}
 
-	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	newHash, err := auth.HashPassword(req.NewPassword)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "password could not be processed"})
+		writeError(w, http.StatusInternalServerError, "password could not be processed")
 		return
 	}
 
 	user.PasswordHash = string(newHash)
-	if err := h.store.Update(user); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "could not be updated"})
+	if err := h.store.Update(ctx, user); err != nil {
+		writeError(w, http.StatusInternalServerError, "could not change password")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"message": "password changed"})
+	middleware.ClearSessionCookie(w)
+	writeJSON(w, http.StatusOK, messageResponse{Message: "password changed; sign in again"})
 }
 
 type updateMeRequest struct {
@@ -256,90 +235,78 @@ type updateMeRequest struct {
 }
 
 func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok || userID == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	var req updateMeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+	if err := decodeJSON(w, r, &req); err != nil {
 		return
 	}
-	if req.Username == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "username cannot be empty"})
+	if err := validate.Username(req.Username); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	user, err := h.store.FindByID(userID)
+	ctx := r.Context()
+	user, err := h.store.FindByID(ctx, userID)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
+		writeError(w, http.StatusNotFound, "user not found")
 		return
 	}
 
-	if existing, err := h.store.FindByUsername(req.Username); err == nil && existing.ID != userID {
-		w.WriteHeader(http.StatusConflict)
-		json.NewEncoder(w).Encode(map[string]string{"error": "this username is already taken"})
+	if existing, err := h.store.FindByUsername(ctx, req.Username); err == nil && existing.ID != userID {
+		writeError(w, http.StatusConflict, "this username is already taken")
 		return
 	}
 
 	user.Username = req.Username
-	if err := h.store.Update(user); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "could not be updated"})
+	if err := h.store.Update(ctx, user); err != nil {
+		writeError(w, http.StatusInternalServerError, "could not be updated")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
-		"id":       user.ID,
-		"email":    user.Email,
-		"username": user.Username,
+	writeJSON(w, http.StatusOK, userResponse{
+		ID: user.ID, Email: user.Email, Username: user.Username,
 	})
 }
 
 func (h *AuthHandler) DeleteMe(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok || userID == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	if err := h.store.Delete(userID); err != nil {
-		if err == storage.ErrUserNotFound {
-			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]string{"error": "user not found"})
+	if err := h.store.Delete(r.Context(), userID); err != nil {
+		if errors.Is(err, storage.ErrUserNotFound) {
+			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "could not delete account"})
+		writeError(w, http.StatusInternalServerError, "could not delete account")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"message": "account deleted"})
+	middleware.ClearSessionCookie(w)
+	writeJSON(w, http.StatusOK, messageResponse{Message: "account deleted"})
 }
 
 func (h *AuthHandler) Validate(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok || userID == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"valid":   true,
-		"user_id": userID,
-	})
+	writeJSON(w, http.StatusOK, validateResponse{Valid: true, UserID: userID})
+}
+
+func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return err
+	}
+	return nil
 }
