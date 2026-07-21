@@ -8,7 +8,11 @@ import {
   Metrics,
 } from "../types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+const PRODUCTION_API_URL = "https://mlc-llm-monitoring.onrender.com";
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.VERCEL === "1" ? PRODUCTION_API_URL : "http://localhost:8080");
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let res: Response;
