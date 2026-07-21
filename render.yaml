@@ -4,7 +4,8 @@ services:
     runtime: go
     plan: free
     branch: main
-    buildCommand: go build -tags netgo -ldflags '-s -w' -o server .
+    rootDir: masterfabric-go
+    buildCommand: go build -tags netgo -ldflags '-s -w' -o server ./cmd/server
     startCommand: ./server
     envVars:
       - key: DATABASE_URL
