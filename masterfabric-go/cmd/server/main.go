@@ -67,7 +67,7 @@ func run() error {
 	}
 
 	appJWT := infraAuth.NewAppJWTService(cfg.JWT.Secret)
-	deps := buildDependencies(cfg, db, appJWT)
+	deps := buildDependencies(log, cfg, db, appJWT)
 
 	handler := router.New(deps)
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
@@ -122,7 +122,7 @@ func validateJWTSecret(secret string) {
 	}
 }
 
-func buildDependencies(cfg *config.Config, db *pgxpool.Pool, appJWT *infraAuth.AppJWTService) router.Dependencies {
+func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, appJWT *infraAuth.AppJWTService) router.Dependencies {
 	userRepo := pgIam.NewAppUserRepo(db)
 	reviewRepo := pgLlm.NewReviewRepo(db)
 	configRepo := memConfig.NewConfigRepo()
@@ -148,6 +148,7 @@ func buildDependencies(cfg *config.Config, db *pgxpool.Pool, appJWT *infraAuth.A
 	updateConfigUC := configUC.NewUpdateConfigUseCase(configRepo)
 
 	return router.Dependencies{
+		Logger:             log,
 		DB:                 db,
 		CORSAllowedOrigins: cfg.Server.CORSAllowedOrigins,
 		MaxBodyBytes:       cfg.Server.MaxBodyBytes,
