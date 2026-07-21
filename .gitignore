@@ -1,6 +1,6 @@
 tmp/
 *.exe
 .env
-server
-server.exe
+/server
+/server.exe
 .cursor/mcp.env
