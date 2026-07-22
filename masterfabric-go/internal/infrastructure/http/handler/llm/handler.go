@@ -16,6 +16,7 @@ type Handler struct {
 	createReviewUC   *llmUC.CreateReviewUseCase
 	getReviewUC      *llmUC.GetReviewUseCase
 	listReviewsUC    *llmUC.ListReviewsUseCase
+	analyzeReviewUC  *llmUC.AnalyzeReviewUseCase
 	createDecisionUC *llmUC.CreateDecisionUseCase
 	listDecisionsUC  *llmUC.ListDecisionsUseCase
 	createScoreUC    *llmUC.CreateScoreUseCase
@@ -27,6 +28,7 @@ func NewHandler(
 	createReviewUC *llmUC.CreateReviewUseCase,
 	getReviewUC *llmUC.GetReviewUseCase,
 	listReviewsUC *llmUC.ListReviewsUseCase,
+	analyzeReviewUC *llmUC.AnalyzeReviewUseCase,
 	createDecisionUC *llmUC.CreateDecisionUseCase,
 	listDecisionsUC *llmUC.ListDecisionsUseCase,
 	createScoreUC *llmUC.CreateScoreUseCase,
@@ -37,6 +39,7 @@ func NewHandler(
 		createReviewUC:   createReviewUC,
 		getReviewUC:      getReviewUC,
 		listReviewsUC:    listReviewsUC,
+		analyzeReviewUC:  analyzeReviewUC,
 		createDecisionUC: createDecisionUC,
 		listDecisionsUC:  listDecisionsUC,
 		createScoreUC:    createScoreUC,
@@ -105,6 +108,43 @@ func (h *Handler) ListReviews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.LegacyJSON(w, http.StatusOK, reviews)
+}
+
+func (h *Handler) AnalyzeReview(w http.ResponseWriter, r *http.Request) {
+	if h.analyzeReviewUC == nil {
+		response.LegacyError(w, http.StatusServiceUnavailable, "server-side inference is not configured")
+		return
+	}
+
+	userID, ok := middleware.LegacyUserID(r.Context())
+	if !ok {
+		response.LegacyError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		response.LegacyError(w, http.StatusBadRequest, "review id required")
+		return
+	}
+
+	decision, err := h.analyzeReviewUC.Execute(r.Context(), userID, id)
+	if err != nil {
+		status := http.StatusInternalServerError
+		switch err.Error() {
+		case "review not found":
+			status = http.StatusNotFound
+		case "decision already exists for this review":
+			status = http.StatusConflict
+		case "mlc inference is not configured", "inference failed":
+			status = http.StatusServiceUnavailable
+		default:
+			status = http.StatusBadRequest
+		}
+		response.LegacyError(w, status, err.Error())
+		return
+	}
+	response.LegacyJSON(w, http.StatusCreated, decision)
 }
 
 func (h *Handler) SaveDecision(w http.ResponseWriter, r *http.Request) {

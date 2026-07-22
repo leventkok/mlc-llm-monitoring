@@ -113,4 +113,7 @@ export const reviewApi = {
     request<Score>("/scores", { method: "POST", body: JSON.stringify(data) }),
 
   metrics: () => request<Metrics>("/metrics"),
+
+  analyze: (reviewId: string) =>
+    request<Decision>(`/reviews/${reviewId}/analyze`, { method: "POST" }),
 };

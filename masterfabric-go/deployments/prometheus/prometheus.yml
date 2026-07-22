@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: backend
+    dns_sd_configs:
+      - names: ["backend"]
+        type: A
+        port: 8080
+
+  - job_name: mlc-llm
+    dns_sd_configs:
+      - names: ["mlc-llm"]
+        type: A
+        port: 8080

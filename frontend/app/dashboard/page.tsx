@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { reviewApi } from "@/lib/api";
-import { analyzeReview } from "@/lib/llm";
+import { analyzeReview, isEngineCachedInSession, warmupEngine } from "@/lib/llm";
 import { Review, Decision } from "@/types";
 import { categoryBadge, sentimentBadge } from "@/lib/badges";
+
+const useServerInference =
+  process.env.NEXT_PUBLIC_USE_SERVER_INFERENCE === "true";
 
 export default function DashboardPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -18,7 +21,27 @@ export default function DashboardPage() {
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
   const [error, setError] = useState("");
   const [modelProgress, setModelProgress] = useState(0);
-  const [modelReady, setModelReady] = useState(false);
+  const [modelReady, setModelReady] = useState(
+    useServerInference || isEngineCachedInSession(),
+  );
+
+  useEffect(() => {
+    if (useServerInference) return;
+
+    let cancelled = false;
+
+    warmupEngine((pct) => {
+      if (cancelled) return;
+      setModelProgress(pct);
+      if (pct >= 1) setModelReady(true);
+    }).catch(() => {
+      if (!cancelled) setModelReady(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     Promise.all([reviewApi.list(), reviewApi.decisions()])
@@ -60,22 +83,20 @@ export default function DashboardPage() {
     setAnalyzing(review.id);
     setError("");
     try {
-      // 1) Run Gemma in the browser
-      const result = await analyzeReview(review.text, (pct) => {
-        setModelProgress(pct);
-        if (pct >= 1) setModelReady(true);
-      });
-      setModelReady(true);
-
-      // 2) Persist the decision to the backend
-      const decision = await reviewApi.saveDecision({
-        review_id: review.id,
-        category: result.category,
-        sentiment: result.sentiment,
-        raw_output: result.rawOutput,
-        latency_ms: result.latencyMs,
-      });
-      setDecisions((prev) => ({ ...prev, [review.id]: decision }));
+      if (useServerInference) {
+        const decision = await reviewApi.analyze(review.id);
+        setDecisions((prev) => ({ ...prev, [review.id]: decision }));
+      } else {
+        const result = await analyzeReview(review.text);
+        const decision = await reviewApi.saveDecision({
+          review_id: review.id,
+          category: result.category,
+          sentiment: result.sentiment,
+          raw_output: result.rawOutput,
+          latency_ms: result.latencyMs,
+        });
+        setDecisions((prev) => ({ ...prev, [review.id]: decision }));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
@@ -94,26 +115,37 @@ export default function DashboardPage() {
             Analyze reviews
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Add a review and let Gemma classify it — running in your browser.
+            {useServerInference
+              ? "Add a review and analyze via the local Docker MLC service."
+              : "Add a review and let Gemma classify it — running in your browser."}
           </p>
         </div>
 
-        {/* Model loading banner (only while downloading) */}
-        {analyzing && !modelReady && (
+        {/* Model loading banner (first visit or cache miss only) */}
+        {!useServerInference && !modelReady && (
           <div className="mb-6 rounded-xl border border-accent/30 bg-accent/5 p-4">
             <p className="font-mono text-xs text-accent">
-              loading gemma… {Math.round(modelProgress * 100)}%
+              {modelProgress > 0
+                ? `loading gemma… ${Math.round(modelProgress * 100)}%`
+                : "preparing gemma…"}
             </p>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
               <div
                 className="h-full rounded-full bg-accent transition-all"
-                style={{ width: `${modelProgress * 100}%` }}
+                style={{ width: `${Math.max(modelProgress * 100, 4)}%` }}
               />
             </div>
             <p className="mt-2 text-xs text-muted">
-              First run downloads the model (one time, then cached).
+              First visit downloads the model once; later visits reuse the browser
+              cache (IndexedDB).
             </p>
           </div>
+        )}
+
+        {modelReady && !useServerInference && (
+          <p className="mb-6 font-mono text-xs text-muted">
+            gemma ready — analyze runs locally without re-downloading.
+          </p>
         )}
 
         {/* Add review form */}
@@ -218,7 +250,7 @@ export default function DashboardPage() {
                   </div>
                   <button
                     onClick={() => handleAnalyze(review)}
-                    disabled={analyzing !== null}
+                    disabled={analyzing !== null || !modelReady}
                     className="shrink-0 rounded-lg border border-accent px-3 py-1.5 font-mono text-xs text-accent transition hover:bg-accent hover:text-accent-fg disabled:opacity-50"
                   >
                     {analyzing === review.id ? "analyzing…" : "analyze"}

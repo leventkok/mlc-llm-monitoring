@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/prometheus"
+	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -26,10 +26,11 @@ func Setup(ctx context.Context, serviceName, serviceVersion string) (func(contex
 	}
 
 	// Metrics: Prometheus exporter
-	promExporter, err := prometheus.New()
+	promExporter, err := otelprom.New()
 	if err != nil {
 		return nil, fmt.Errorf("create prometheus exporter: %w", err)
 	}
+	_ = promExporter
 
 	meterProvider := sdkmetric.NewMeterProvider(
 		sdkmetric.WithReader(promExporter),

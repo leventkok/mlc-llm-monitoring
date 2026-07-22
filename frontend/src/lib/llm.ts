@@ -1,18 +1,108 @@
-import { CreateMLCEngine, MLCEngineInterface } from "@mlc-ai/web-llm";
+import {
+  CreateMLCEngine,
+  MLCEngineInterface,
+  prebuiltAppConfig,
+  type AppConfig,
+} from "@mlc-ai/web-llm";
 
 const MODEL_ID = "gemma-2-2b-it-q4f16_1-MLC";
+const ENGINE_PROMISE_KEY = "__mlc_llm_engine_promise__";
+const ENGINE_READY_KEY = "webllm_engine_ready";
 
-let enginePromise: Promise<MLCEngineInterface> | null = null;
+const appConfig: AppConfig = {
+  ...prebuiltAppConfig,
+  // IndexedDB survives reloads better than Cache API alone in some browsers.
+  cacheBackend: "indexeddb",
+};
 
-export function getEngine(
-  onProgress?: (pct: number) => void,
-): Promise<MLCEngineInterface> {
-  if (!enginePromise) {
-    enginePromise = CreateMLCEngine(MODEL_ID, {
-      initProgressCallback: (p) => onProgress?.(p.progress),
-    });
+type ProgressListener = (pct: number) => void;
+const progressListeners = new Set<ProgressListener>();
+
+function getStoredEnginePromise(): Promise<MLCEngineInterface> | null {
+  const g = globalThis as Record<string, unknown>;
+  const value = g[ENGINE_PROMISE_KEY];
+  if (value instanceof Promise) {
+    return value as Promise<MLCEngineInterface>;
   }
-  return enginePromise;
+  return null;
+}
+
+function setStoredEnginePromise(
+  promise: Promise<MLCEngineInterface> | null,
+): void {
+  const g = globalThis as Record<string, unknown>;
+  if (promise) {
+    g[ENGINE_PROMISE_KEY] = promise;
+  } else {
+    delete g[ENGINE_PROMISE_KEY];
+  }
+}
+
+function notifyProgress(pct: number): void {
+  for (const listener of progressListeners) {
+    listener(pct);
+  }
+  if (pct >= 1 && typeof sessionStorage !== "undefined") {
+    sessionStorage.setItem(ENGINE_READY_KEY, MODEL_ID);
+  }
+}
+
+export function isEngineCachedInSession(): boolean {
+  if (typeof sessionStorage === "undefined") return false;
+  return sessionStorage.getItem(ENGINE_READY_KEY) === MODEL_ID;
+}
+
+export function subscribeEngineProgress(
+  listener: ProgressListener,
+): () => void {
+  progressListeners.add(listener);
+  return () => progressListeners.delete(listener);
+}
+
+/**
+ * Returns the shared WebLLM engine (single-flight init).
+ * Model weights are cached in the browser after the first successful load.
+ */
+export function getEngine(
+  onProgress?: ProgressListener,
+): Promise<MLCEngineInterface> {
+  if (onProgress) {
+    progressListeners.add(onProgress);
+  }
+
+  let promise = getStoredEnginePromise();
+  if (!promise) {
+    promise = CreateMLCEngine(MODEL_ID, {
+      appConfig,
+      initProgressCallback: (report) => {
+        notifyProgress(report.progress);
+      },
+    })
+      .then((engine) => {
+        notifyProgress(1);
+        return engine;
+      })
+      .catch((err) => {
+        setStoredEnginePromise(null);
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.removeItem(ENGINE_READY_KEY);
+        }
+        throw err;
+      });
+
+    setStoredEnginePromise(promise);
+  } else if (isEngineCachedInSession()) {
+    queueMicrotask(() => onProgress?.(1));
+  }
+
+  return promise;
+}
+
+/** Pre-load the model once when the app opens so Analyze does not re-trigger download. */
+export function warmupEngine(
+  onProgress?: ProgressListener,
+): Promise<MLCEngineInterface> {
+  return getEngine(onProgress);
 }
 
 export interface AnalyzeResult {
@@ -27,7 +117,7 @@ const SENTIMENTS = ["positive", "negative", "neutral"];
 
 export async function analyzeReview(
   text: string,
-  onProgress?: (pct: number) => void,
+  onProgress?: ProgressListener,
 ): Promise<AnalyzeResult> {
   const engine = await getEngine(onProgress);
   const start = performance.now();

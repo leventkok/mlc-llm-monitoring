@@ -13,21 +13,25 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	iamUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/iam/usecase"
 	configUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/config/usecase"
 	llmUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/usecase"
 	infraAuth "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/auth"
+	memConfig "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/config/memory"
 	configHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/config"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/health"
 	iamHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/iam"
 	llmHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/llm"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/router"
-	memConfig "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/config/memory"
+	infraMLC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/mlc"
 	pgIam "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/iam"
 	pgLlm "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/llm"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/config"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/database"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/logger"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/telemetry"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/version"
 )
 
 func main() {
@@ -66,8 +70,21 @@ func run() error {
 		return fmt.Errorf("database ping failed: %w", err)
 	}
 
+	var metricsHandler http.Handler
+		if cfg.Telemetry.Enabled {
+		shutdownTelemetry, err := telemetry.Setup(ctx, cfg.Telemetry.ServiceName, version.Version)
+		if err != nil {
+			return fmt.Errorf("telemetry setup failed: %w", err)
+		}
+		defer func() {
+			_ = shutdownTelemetry(context.Background())
+		}()
+		metricsHandler = promhttp.Handler()
+		log.Info("prometheus metrics enabled", "path", "/metrics")
+	}
+
 	appJWT := infraAuth.NewAppJWTService(cfg.JWT.Secret)
-	deps := buildDependencies(log, cfg, db, appJWT)
+	deps := buildDependencies(log, cfg, db, appJWT, metricsHandler)
 
 	handler := router.New(deps)
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
@@ -122,7 +139,7 @@ func validateJWTSecret(secret string) {
 	}
 }
 
-func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, appJWT *infraAuth.AppJWTService) router.Dependencies {
+func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, appJWT *infraAuth.AppJWTService, metricsHandler http.Handler) router.Dependencies {
 	userRepo := pgIam.NewAppUserRepo(db)
 	reviewRepo := pgLlm.NewReviewRepo(db)
 	configRepo := memConfig.NewConfigRepo()
@@ -144,6 +161,13 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 	listScoresUC := llmUC.NewListScoresUseCase(reviewRepo)
 	getMetricsUC := llmUC.NewGetMetricsUseCase(reviewRepo)
 
+	var analyzeReviewUC *llmUC.AnalyzeReviewUseCase
+	if cfg.MLC.Enabled {
+		mlcClient := infraMLC.NewClient(cfg.MLC.BaseURL, cfg.MLC.Model)
+		analyzeReviewUC = llmUC.NewAnalyzeReviewUseCase(reviewRepo, mlcClient)
+		log.Info("server-side mlc inference enabled", "base_url", cfg.MLC.BaseURL, "model", cfg.MLC.Model)
+	}
+
 	getConfigUC := configUC.NewGetConfigUseCase(configRepo)
 	updateConfigUC := configUC.NewUpdateConfigUseCase(configRepo)
 
@@ -153,11 +177,12 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 		CORSAllowedOrigins: cfg.Server.CORSAllowedOrigins,
 		MaxBodyBytes:       cfg.Server.MaxBodyBytes,
 		AppJWT:             appJWT,
+		MetricsHandler:     metricsHandler,
 		IAMHandler: iamHandler.NewHandler(
 			registerUC, loginUC, getMeUC, updateMeUC, deleteMeUC, refreshUC, changePasswordUC,
 		),
 		LLMHandler: llmHandler.NewHandler(
-			createReviewUC, getReviewUC, listReviewsUC,
+			createReviewUC, getReviewUC, listReviewsUC, analyzeReviewUC,
 			createDecisionUC, listDecisionsUC,
 			createScoreUC, listScoresUC, getMetricsUC,
 		),

@@ -29,6 +29,7 @@ type Dependencies struct {
 	IAMHandler    *iamHandler.Handler
 	LLMHandler    *llmHandler.Handler
 	ConfigHandler *configHandler.Handler
+	MetricsHandler http.Handler
 }
 
 // New creates the root Chi router with legacy frontend API routes at root paths.
@@ -49,6 +50,10 @@ func New(deps Dependencies) http.Handler {
 	legacyHealth := health.LegacyHealth(deps.DB)
 	r.Get("/health", legacyHealth)
 	r.Get("/ready", legacyHealth)
+
+	if deps.MetricsHandler != nil {
+		r.Handle("/metrics", deps.MetricsHandler)
+	}
 
 	if deps.ConfigHandler != nil {
 		r.Get("/config", deps.ConfigHandler.Get)
@@ -75,6 +80,7 @@ func New(deps Dependencies) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.LegacyAuth(deps.AppJWT))
 			r.Get("/reviews/{id}", deps.LLMHandler.GetReview)
+			r.Post("/reviews/{id}/analyze", deps.LLMHandler.AnalyzeReview)
 			r.Get("/reviews", deps.LLMHandler.ListReviews)
 			r.Post("/reviews", deps.LLMHandler.CreateReview)
 			r.Get("/decisions", deps.LLMHandler.ListDecisions)

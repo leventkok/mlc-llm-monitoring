@@ -20,6 +20,8 @@ type Config struct {
 	Kafka     KafkaConfig
 	WebSocket WebSocketConfig
 	Log       LogConfig
+	MLC       MLCConfig
+	Telemetry TelemetryConfig
 }
 
 // WebSocketConfig holds real-time WebSocket settings.
@@ -101,6 +103,19 @@ type LogConfig struct {
 	Format string // json, text
 }
 
+// MLCConfig holds server-side MLC LLM inference settings.
+type MLCConfig struct {
+	BaseURL string
+	Model   string
+	Enabled bool
+}
+
+// TelemetryConfig holds metrics and tracing settings.
+type TelemetryConfig struct {
+	Enabled     bool
+	ServiceName string
+}
+
 // Load reads configuration from environment variables with sensible defaults.
 func Load() *Config {
 	corsOrigins := envOrDefaultSlice("ALLOWED_ORIGINS", nil)
@@ -164,6 +179,15 @@ func Load() *Config {
 		Log: LogConfig{
 			Level:  envOrDefault("LOG_LEVEL", "info"),
 			Format: envOrDefault("LOG_FORMAT", "json"),
+		},
+		MLC: MLCConfig{
+			BaseURL: envOrDefault("MLC_LLM_BASE_URL", ""),
+			Model:   envOrDefault("MLC_LLM_MODEL", "gemma-2-2b-it-q4f16_1-MLC"),
+			Enabled: envOrDefault("MLC_LLM_ENABLED", "false") == "true" || os.Getenv("MLC_LLM_BASE_URL") != "",
+		},
+		Telemetry: TelemetryConfig{
+			Enabled:     envOrDefault("METRICS_ENABLED", "false") == "true",
+			ServiceName: envOrDefault("OTEL_SERVICE_NAME", "app-review-monitoring-api"),
 		},
 	}
 

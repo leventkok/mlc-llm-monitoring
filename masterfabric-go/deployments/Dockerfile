@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/masterfabric ./cmd/server
 # Runtime stage
 FROM alpine:3.24
 
-RUN apk add --no-cache ca-certificates tzdata \
+RUN apk add --no-cache ca-certificates tzdata wget \
     && addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
