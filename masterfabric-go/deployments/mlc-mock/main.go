@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -25,6 +27,11 @@ type chatResponse struct {
 	} `json:"choices"`
 }
 
+var (
+	inferenceTotal          uint64
+	inferenceLatencyMsTotal uint64
+)
+
 func main() {
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" {
@@ -36,6 +43,7 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+	mux.HandleFunc("/metrics", handleMetrics)
 	mux.HandleFunc("/v1/chat/completions", withAPIKey(handleChat))
 
 	log.Printf("mlc-mock listening on %s", addr)
@@ -76,6 +84,8 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 
 	// Simulate inference latency for local load tests.
 	time.Sleep(150 * time.Millisecond)
+	atomic.AddUint64(&inferenceTotal, 1)
+	atomic.AddUint64(&inferenceLatencyMsTotal, 150)
 
 	resp := chatResponse{}
 	resp.Choices = []struct {
@@ -177,4 +187,16 @@ func detectCategory(text, sentiment string) string {
 		return "praise"
 	}
 	return "other"
+}
+
+func handleMetrics(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	total := atomic.LoadUint64(&inferenceTotal)
+	latSum := atomic.LoadUint64(&inferenceLatencyMsTotal)
+	_, _ = fmt.Fprintf(w, "# HELP mlc_inference_requests_total Total MLC inference requests.\n")
+	_, _ = fmt.Fprintf(w, "# TYPE mlc_inference_requests_total counter\n")
+	_, _ = fmt.Fprintf(w, "mlc_inference_requests_total %d\n", total)
+	_, _ = fmt.Fprintf(w, "# HELP mlc_inference_latency_ms_sum Sum of simulated inference latency in milliseconds.\n")
+	_, _ = fmt.Fprintf(w, "# TYPE mlc_inference_latency_ms_sum counter\n")
+	_, _ = fmt.Fprintf(w, "mlc_inference_latency_ms_sum %d\n", latSum)
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/llm/model"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/llm/repository"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/validate"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/metrics"
 )
 
 type CreateReviewUseCase struct {
@@ -47,5 +48,6 @@ func (uc *CreateReviewUseCase) Execute(ctx context.Context, userID string, req d
 	if err := uc.reviews.CreateReview(ctx, review); err != nil {
 		return model.Review{}, errors.New("could not save review")
 	}
+	metrics.RecordReviewCreated()
 	return review, nil
 }

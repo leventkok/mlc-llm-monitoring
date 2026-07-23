@@ -30,6 +30,7 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/config"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/database"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/logger"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/metrics"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/telemetry"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/version"
 )
@@ -71,7 +72,9 @@ func run() error {
 	}
 
 	var metricsHandler http.Handler
-		if cfg.Telemetry.Enabled {
+	metricsEnabled := cfg.Telemetry.Enabled
+	if metricsEnabled {
+		metrics.Register()
 		shutdownTelemetry, err := telemetry.Setup(ctx, cfg.Telemetry.ServiceName, version.Version)
 		if err != nil {
 			return fmt.Errorf("telemetry setup failed: %w", err)
@@ -84,7 +87,7 @@ func run() error {
 	}
 
 	appJWT := infraAuth.NewAppJWTService(cfg.JWT.Secret)
-	deps := buildDependencies(log, cfg, db, appJWT, metricsHandler)
+	deps := buildDependencies(log, cfg, db, appJWT, metricsHandler, metricsEnabled)
 
 	handler := router.New(deps)
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
@@ -139,7 +142,7 @@ func validateJWTSecret(secret string) {
 	}
 }
 
-func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, appJWT *infraAuth.AppJWTService, metricsHandler http.Handler) router.Dependencies {
+func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, appJWT *infraAuth.AppJWTService, metricsHandler http.Handler, metricsEnabled bool) router.Dependencies {
 	userRepo := pgIam.NewAppUserRepo(db)
 	reviewRepo := pgLlm.NewReviewRepo(db)
 	configRepo := memConfig.NewConfigRepo()
@@ -176,6 +179,7 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 		DB:                 db,
 		CORSAllowedOrigins: cfg.Server.CORSAllowedOrigins,
 		MaxBodyBytes:       cfg.Server.MaxBodyBytes,
+		MetricsEnabled:     metricsEnabled,
 		AppJWT:             appJWT,
 		MetricsHandler:     metricsHandler,
 		IAMHandler: iamHandler.NewHandler(

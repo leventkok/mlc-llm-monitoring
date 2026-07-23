@@ -10,6 +10,7 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/llm/repository"
 	pgLlm "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/llm"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/validate"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/metrics"
 )
 
 type CreateDecisionUseCase struct {
@@ -55,6 +56,8 @@ func (uc *CreateDecisionUseCase) Execute(ctx context.Context, userID string, req
 	if err := persistAutoScore(ctx, uc.reviews, userID, decision); err != nil {
 		return model.Decision{}, errors.New("could not save auto score")
 	}
+
+	metrics.RecordDecision(decision.Category, decision.Sentiment)
 
 	return decision, nil
 }

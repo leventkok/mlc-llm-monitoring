@@ -1,7 +1,22 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
 
 scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
+
+  - job_name: render-api
+    scheme: https
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["mlc-llm-monitoring.onrender.com"]
+        labels:
+          environment: production
+
+  - job_name: mlc-llm
+    dns_sd_configs:
+      - names: ["mlc-llm"]
+        type: A
+        port: 8080

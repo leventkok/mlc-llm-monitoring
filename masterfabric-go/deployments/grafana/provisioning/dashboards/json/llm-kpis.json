@@ -1,0 +1,148 @@
+{
+  "uid": "llm-kpis",
+  "title": "LLM Review Monitoring KPIs",
+  "tags": ["llm", "monitoring"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Analyze success rate",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(app_review_llm_analyze_total{status=\"success\"}[5m])) / clamp_min(sum(rate(app_review_llm_analyze_total[5m])), 0.001)",
+          "legendFormat": "success rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.8 },
+              { "color": "green", "value": 0.95 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Avg auto score (1-5)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(app_review_auto_score_quality_sum[5m])) / clamp_min(sum(rate(app_review_auto_score_quality_count[5m])), 0.001)",
+          "legendFormat": "avg quality"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "min": 1,
+          "max": 5,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "green", "value": 4 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Reviews created",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(app_review_reviews_created_total[1h]))",
+          "legendFormat": "reviews"
+        }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 0 } }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "MLC inference p95 (s)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(app_review_llm_inference_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 2 } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Analyze throughput",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(app_review_llm_analyze_total{status=\"success\"}[1m]))",
+          "legendFormat": "success"
+        },
+        {
+          "expr": "sum(rate(app_review_llm_analyze_total{status=\"error\"}[1m]))",
+          "legendFormat": "error"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "HTTP request rate (Render API)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(app_review_http_requests_total[1m]))",
+          "legendFormat": "req/s"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Decisions by category",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum by (category) (rate(app_review_decisions_total[5m]))",
+          "legendFormat": "{{category}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Local MLC mock inference",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "expr": "rate(mlc_inference_requests_total[1m])",
+          "legendFormat": "inference/s"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    }
+  ]
+}

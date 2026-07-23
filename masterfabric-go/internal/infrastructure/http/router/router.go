@@ -24,6 +24,7 @@ type Dependencies struct {
 	DB                 *pgxpool.Pool
 	CORSAllowedOrigins []string
 	MaxBodyBytes       int64
+	MetricsEnabled     bool
 	AppJWT             *infraAuth.AppJWTService
 
 	IAMHandler    *iamHandler.Handler
@@ -45,6 +46,9 @@ func New(deps Dependencies) http.Handler {
 	r.Use(cors.Handler(middleware.CORSOptions(deps.CORSAllowedOrigins)))
 	r.Use(middleware.SecurityHeaders)
 	r.Use(middleware.RequestTimeoutLegacy)
+	if deps.MetricsEnabled {
+		r.Use(middleware.Prometheus)
+	}
 	r.Use(middleware.LegacyRateLimit(10, time.Minute, "/auth/login", "/auth/register"))
 
 	legacyHealth := health.LegacyHealth(deps.DB)
@@ -87,7 +91,7 @@ func New(deps Dependencies) http.Handler {
 			r.Post("/decisions", deps.LLMHandler.SaveDecision)
 			r.Get("/scores", deps.LLMHandler.ListScores)
 			r.Post("/scores", deps.LLMHandler.CreateScore)
-			r.Get("/metrics", deps.LLMHandler.GetMetrics)
+			r.Get("/stats", deps.LLMHandler.GetMetrics)
 		})
 	}
 

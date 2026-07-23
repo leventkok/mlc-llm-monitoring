@@ -21,7 +21,8 @@ docker compose -f docker-compose.stack.yml --env-file .env.docker up --build
 |---------|-----|
 | API gateway | http://127.0.0.1:8080 |
 | Health | http://127.0.0.1:8080/health |
-| Metrics | http://127.0.0.1:8080/metrics |
+| Metrics (Prometheus) | http://127.0.0.1:8080/metrics |
+| Business stats (UI) | http://127.0.0.1:8080/stats (auth) |
 | Prometheus | http://127.0.0.1:9090 |
 | Grafana | http://127.0.0.1:3001 (admin / admin) |
 | MLC mock (via gateway) | http://127.0.0.1:8080/llm/health |

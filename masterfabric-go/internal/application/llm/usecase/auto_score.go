@@ -9,6 +9,7 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/llm/model"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/llm/repository"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/validate"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/metrics"
 )
 
 // ComputeAutoQuality scores LLM output quality (1-5) from raw response metadata.
@@ -81,6 +82,7 @@ func clampQuality(v int) int {
 
 func persistAutoScore(ctx context.Context, reviews repository.ReviewRepository, userID string, decision model.Decision) error {
 	quality := ComputeAutoQuality(decision.Category, decision.Sentiment, decision.RawOutput, decision.LatencyMs)
+	metrics.RecordAutoScore(quality)
 	return reviews.CreateScore(ctx, model.Score{
 		ID:         uuid.NewString(),
 		DecisionID: decision.ID,

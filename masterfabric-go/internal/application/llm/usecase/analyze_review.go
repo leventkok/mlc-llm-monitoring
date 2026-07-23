@@ -9,6 +9,7 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/llm/repository"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/mlc"
 	pgLlm "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/llm"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/metrics"
 )
 
 // ReviewClassifier runs inference for review text.
@@ -40,15 +41,22 @@ func (uc *AnalyzeReviewUseCase) Execute(ctx context.Context, userID, reviewID st
 
 	classification, err := uc.classifier.ClassifyReview(ctx, review.Text)
 	if err != nil {
+		metrics.RecordAnalyzeError()
 		return model.Decision{}, errors.New("inference failed")
 	}
 
 	createUC := NewCreateDecisionUseCase(uc.reviews)
-	return createUC.Execute(ctx, userID, dto.SaveDecisionRequest{
+	decision, err := createUC.Execute(ctx, userID, dto.SaveDecisionRequest{
 		ReviewID:  reviewID,
 		Category:  classification.Category,
 		Sentiment: classification.Sentiment,
 		RawOutput: classification.RawOutput,
 		LatencyMs: classification.LatencyMs,
 	})
+	if err != nil {
+		return model.Decision{}, err
+	}
+
+	metrics.RecordAnalyzeSuccess(classification.LatencyMs)
+	return decision, nil
 }
