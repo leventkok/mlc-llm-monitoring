@@ -183,9 +183,7 @@ SELECT
   (SELECT coalesce(avg(sc.quality), 0) FROM scores sc JOIN decisions d ON d.id = sc.decision_id JOIN reviews r ON r.id = d.review_id WHERE r.user_id = $1),
   (SELECT coalesce(avg(d.latency_ms), 0) FROM decisions d JOIN reviews r ON r.id = d.review_id WHERE r.user_id = $1),
   (SELECT count(*)::int FROM scores sc JOIN decisions d ON d.id = sc.decision_id JOIN reviews r ON r.id = d.review_id
-     WHERE r.user_id = $1 AND sc.correct_category IS NOT NULL AND sc.correct_category <> ''),
-  (SELECT count(*)::int FROM scores sc JOIN decisions d ON d.id = sc.decision_id JOIN reviews r ON r.id = d.review_id
-     WHERE r.user_id = $1 AND sc.correct_category IS NOT NULL AND sc.correct_category <> '' AND sc.correct_category = d.category),
+     WHERE r.user_id = $1 AND sc.quality >= 4),
   (SELECT coalesce(json_object_agg(category, cnt), '{}')::text FROM (
       SELECT d.category, count(*)::int AS cnt FROM decisions d JOIN reviews r ON r.id = d.review_id WHERE r.user_id = $1 GROUP BY d.category
    ) s),
@@ -197,7 +195,7 @@ SELECT
 func (r *ReviewRepo) GetMetrics(ctx context.Context, userID string) (model.Metrics, error) {
 	var m model.Metrics
 	var catJSON, sentJSON string
-	var totalGraded, correct int
+	var compliant int
 
 	err := r.pool.QueryRow(ctx, metricsQuery, userID).Scan(
 		&m.TotalReviews,
@@ -205,8 +203,7 @@ func (r *ReviewRepo) GetMetrics(ctx context.Context, userID string) (model.Metri
 		&m.TotalScores,
 		&m.AvgQuality,
 		&m.AvgLatencyMs,
-		&totalGraded,
-		&correct,
+		&compliant,
 		&catJSON,
 		&sentJSON,
 	)
@@ -219,8 +216,8 @@ func (r *ReviewRepo) GetMetrics(ctx context.Context, userID string) (model.Metri
 	_ = json.Unmarshal([]byte(catJSON), &m.CategoryCounts)
 	_ = json.Unmarshal([]byte(sentJSON), &m.SentimentCounts)
 
-	if totalGraded > 0 {
-		m.AccuracyPct = float64(correct) / float64(totalGraded) * 100
+	if m.TotalScores > 0 {
+		m.AccuracyPct = float64(compliant) / float64(m.TotalScores) * 100
 	}
 	return m, nil
 }

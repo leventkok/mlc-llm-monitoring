@@ -3,46 +3,36 @@
 import { useEffect, useState, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { reviewApi } from "@/lib/api";
-import { Decision, Metrics } from "@/types";
+import { Decision, Metrics, Score } from "@/types";
 import { categoryBadge, sentimentBadge } from "@/lib/badges";
-
-const CATEGORIES = ["bug", "feature", "praise", "spam", "other"];
 
 export default function MonitoringPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [decisions, setDecisions] = useState<Decision[]>([]);
-  const [scored, setScored] = useState<Record<string, boolean>>({});
+  const [scoresByDecision, setScoresByDecision] = useState<Record<string, Score>>(
+    {},
+  );
 
   const load = useCallback(async () => {
-    const [m, d] = await Promise.all([
+    const [m, d, scores] = await Promise.all([
       reviewApi.metrics(),
       reviewApi.decisions(),
+      reviewApi.scores(),
     ]);
     setMetrics(m);
     setDecisions(d);
+    const byDecision: Record<string, Score> = {};
+    for (const s of scores) {
+      if (!byDecision[s.decision_id]) {
+        byDecision[s.decision_id] = s;
+      }
+    }
+    setScoresByDecision(byDecision);
   }, []);
 
   useEffect(() => {
     load().catch(() => {});
   }, [load]);
-
-  async function handleScore(
-    decisionId: string,
-    quality: number,
-    correct?: string,
-  ) {
-    try {
-      await reviewApi.score({
-        decision_id: decisionId,
-        quality,
-        correct_category: correct,
-      });
-      setScored((prev) => ({ ...prev, [decisionId]: true }));
-      load(); // refresh metrics after scoring
-    } catch {
-      // ignore for now
-    }
-  }
 
   return (
     <ProtectedRoute>
@@ -52,27 +42,23 @@ export default function MonitoringPage() {
             monitoring
           </p>
           <h1 className="mt-2 text-2xl font-medium text-foreground">
-            Model performance
+            RAW LLM monitoring
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Observe the raw model&apos;s decisions and score their quality.
+            Auto-scored decisions: output format, latency, and distribution.
           </p>
         </div>
 
-        {/* Metrics */}
         {metrics && (
           <>
-            {/* Accuracy hero + stat cards */}
-            <div className="mb-6 grid gap-4 sm:grid-cols-4">
-              <div className="rounded-2xl border border-accent/30 bg-accent/5 p-5">
-                <p className="font-mono text-xs text-muted">accuracy</p>
+            <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="rounded-2xl border border-accent/30 bg-accent/5 p-5 sm:col-span-2 lg:col-span-1">
+                <p className="font-mono text-xs text-muted">compliance</p>
                 <p className="mt-2 font-mono text-4xl font-medium text-accent">
                   {metrics.accuracy_pct.toFixed(0)}
                   <span className="text-lg">%</span>
                 </p>
-                <p className="mt-1 text-xs text-muted">
-                  vs. human ground truth
-                </p>
+                <p className="mt-1 text-xs text-muted">quality ≥ 4 / 5</p>
               </div>
 
               <Stat label="reviews" value={metrics.total_reviews} />
@@ -82,9 +68,13 @@ export default function MonitoringPage() {
                 value={metrics.avg_quality.toFixed(1)}
                 suffix="/5"
               />
+              <Stat
+                label="avg latency"
+                value={Math.round(metrics.avg_latency_ms)}
+                suffix="ms"
+              />
             </div>
 
-            {/* Category distribution bars */}
             <div className="mb-8 rounded-2xl border border-border bg-surface p-6">
               <p className="mb-4 font-mono text-xs uppercase tracking-wider text-muted">
                 category distribution
@@ -97,9 +87,8 @@ export default function MonitoringPage() {
           </>
         )}
 
-        {/* Decisions to score */}
         <p className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">
-          decisions
+          decisions &amp; raw output
         </p>
         <div className="space-y-3">
           {decisions.length === 0 && (
@@ -108,74 +97,46 @@ export default function MonitoringPage() {
             </p>
           )}
 
-          {decisions.map((d) => (
-            <div
-              key={d.id}
-              className="rounded-2xl border border-border bg-surface p-5"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`rounded-md border px-2 py-0.5 font-mono text-xs ${categoryBadge(d.category)}`}
-                >
-                  {d.category}
-                </span>
-                <span
-                  className={`rounded-md border px-2 py-0.5 font-mono text-xs ${sentimentBadge(d.sentiment)}`}
-                >
-                  {d.sentiment}
-                </span>
-                <span className="ml-auto font-mono text-xs text-muted">
-                  {d.latency_ms}ms
-                </span>
-              </div>
-
-              {scored[d.id] ? (
-                <p className="mt-4 font-mono text-xs text-emerald-500">
-                  ✓ scored
-                </p>
-              ) : (
-                <div className="mt-4 border-t border-border pt-4">
-                  <p className="mb-2 font-mono text-xs text-muted">
-                    rate this decision &amp; set the correct category
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* Quality 1-5 */}
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((q) => (
-                        <button
-                          key={q}
-                          onClick={() => handleScore(d.id, q, d.category)}
-                          className="h-8 w-8 rounded-lg border border-border font-mono text-xs text-muted transition hover:border-accent hover:text-accent"
-                          title={`Quality ${q}, category correct`}
-                        >
-                          {q}
-                        </button>
-                      ))}
-                    </div>
-                    <span className="font-mono text-xs text-muted">
-                      or mark correct category:
+          {decisions.map((d) => {
+            const score = scoresByDecision[d.id];
+            return (
+              <div
+                key={d.id}
+                className="rounded-2xl border border-border bg-surface p-5"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-md border px-2 py-0.5 font-mono text-xs ${categoryBadge(d.category)}`}
+                  >
+                    {d.category}
+                  </span>
+                  <span
+                    className={`rounded-md border px-2 py-0.5 font-mono text-xs ${sentimentBadge(d.sentiment)}`}
+                  >
+                    {d.sentiment}
+                  </span>
+                  {score ? (
+                    <span className="rounded-md border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-xs text-accent">
+                      auto score {score.quality}/5
                     </span>
-                    <select
-                      onChange={(e) =>
-                        e.target.value && handleScore(d.id, 3, e.target.value)
-                      }
-                      defaultValue=""
-                      className="rounded-lg border border-border bg-background px-2 py-1 font-mono text-xs text-foreground outline-none focus:border-accent"
-                    >
-                      <option value="" disabled>
-                        ground truth…
-                      </option>
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  ) : (
+                    <span className="rounded-md border border-border px-2 py-0.5 font-mono text-xs text-muted">
+                      not scored
+                    </span>
+                  )}
+                  <span className="ml-auto font-mono text-xs text-muted">
+                    {d.latency_ms}ms
+                  </span>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {d.raw_output && (
+                  <pre className="mt-4 overflow-x-auto rounded-lg border border-border bg-background p-3 font-mono text-xs text-muted">
+                    {d.raw_output}
+                  </pre>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </ProtectedRoute>

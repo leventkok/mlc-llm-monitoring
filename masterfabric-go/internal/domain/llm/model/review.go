@@ -24,7 +24,7 @@ type Decision struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Score is a human quality rating for a decision.
+// Score is an automatic (or optional manual) quality rating for a decision.
 type Score struct {
 	ID              string    `json:"id"`
 	DecisionID      string    `json:"decision_id"`
