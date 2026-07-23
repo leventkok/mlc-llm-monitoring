@@ -122,11 +122,25 @@ export async function analyzeReview(
   const engine = await getEngine(onProgress);
   const start = performance.now();
 
-  const prompt = `You are a strict classifier for app store reviews.
-Classify the review into exactly one category and one sentiment.
+  const prompt = `You are a strict classifier for app store reviews (any language).
+Classify into exactly one category and one sentiment.
 Categories: ${CATEGORIES.join(", ")}.
 Sentiments: ${SENTIMENTS.join(", ")}.
-Respond with ONLY a JSON object like {"category":"bug","sentiment":"negative"} and nothing else.
+
+Rules:
+- Match the reviewer's tone: complaints and dissatisfaction → negative; compliments → positive; factual/neutral → neutral.
+- bug: crashes, errors, broken or slow functionality.
+- feature: requests for new capability.
+- praise: explicit compliments.
+- spam: promotional junk or fake reviews.
+- other: general feedback that does not fit above (still use the correct sentiment).
+
+Examples:
+{"category":"bug","sentiment":"negative"} — "App keeps crashing"
+{"category":"other","sentiment":"negative"} — "This app is terrible" / "Kötü bir uygulama"
+{"category":"praise","sentiment":"positive"} — "Love this app!"
+
+Respond with ONLY a JSON object and nothing else.
 
 Review: "${text}"`;
 

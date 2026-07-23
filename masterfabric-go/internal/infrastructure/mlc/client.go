@@ -87,11 +87,25 @@ type chatResponse struct {
 func (c *Client) ClassifyReview(ctx context.Context, text string) (Classification, error) {
 	start := time.Now()
 
-	prompt := fmt.Sprintf(`You are a strict classifier for app store reviews.
-Classify the review into exactly one category and one sentiment.
+	prompt := fmt.Sprintf(`You are a strict classifier for app store reviews (any language).
+Classify into exactly one category and one sentiment.
 Categories: %s.
 Sentiments: %s.
-Respond with ONLY a JSON object like {"category":"bug","sentiment":"negative"} and nothing else.
+
+Rules:
+- Match the reviewer's tone: complaints and dissatisfaction → negative; compliments → positive; factual/neutral → neutral.
+- bug: crashes, errors, broken or slow functionality.
+- feature: requests for new capability.
+- praise: explicit compliments.
+- spam: promotional junk or fake reviews.
+- other: general feedback that does not fit above (still use the correct sentiment).
+
+Examples:
+{"category":"bug","sentiment":"negative"} — "App keeps crashing"
+{"category":"other","sentiment":"negative"} — "This app is terrible" / "Kötü bir uygulama"
+{"category":"praise","sentiment":"positive"} — "Love this app!"
+
+Respond with ONLY a JSON object and nothing else.
 
 Review: %q`, strings.Join(categories, ", "), strings.Join(sentiments, ", "), text)
 

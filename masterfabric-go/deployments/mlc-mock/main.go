@@ -113,18 +113,68 @@ func extractReviewText(messages []struct {
 }
 
 func classify(text string) (category, sentiment string) {
-	category = "other"
-	sentiment = "neutral"
-
-	switch {
-	case strings.Contains(text, "crash") || strings.Contains(text, "bug") || strings.Contains(text, "broken"):
-		return "bug", "negative"
-	case strings.Contains(text, "feature") || strings.Contains(text, "request") || strings.Contains(text, "add"):
-		return "feature", "neutral"
-	case strings.Contains(text, "love") || strings.Contains(text, "great") || strings.Contains(text, "awesome"):
-		return "praise", "positive"
-	case strings.Contains(text, "spam") || strings.Contains(text, "fake"):
-		return "spam", "negative"
+	sentiment = detectSentiment(text)
+	category = detectCategory(text, sentiment)
+	if sentiment == "neutral" && (category == "bug" || category == "spam") {
+		sentiment = "negative"
 	}
 	return category, sentiment
+}
+
+func detectSentiment(text string) string {
+	for _, w := range []string{
+		"crash", "bug", "broken", "bad", "terrible", "awful", "hate", "worst", "horrible",
+		"disappoint", "sucks", "poor", "useless", "slow", "freeze", "error", "fail", "garbage",
+		"kötü", "berbat", "rezalet", "iğrenç", "beğenmedim", "tavsiye etmem", "çöp",
+		"sinir", "hayal kırıklığı", "bok", "saçma", "korkunç", "felaket",
+	} {
+		if strings.Contains(text, w) {
+			return "negative"
+		}
+	}
+	for _, w := range []string{
+		"love", "great", "awesome", "excellent", "amazing", "perfect", "best", "fantastic",
+		"güzel", "harika", "mükemmel", "seviyorum", "beğendim", "süper", "muhteşem", "bayıldım",
+	} {
+		if strings.Contains(text, w) {
+			return "positive"
+		}
+	}
+	return "neutral"
+}
+
+func detectCategory(text, sentiment string) string {
+	for _, w := range []string{
+		"crash", "bug", "broken", "error", "fail", "freeze", "not working", "doesn't work",
+		"çök", "hata", "çalışmıyor", "donuyor", "yavaş", "açılmıyor",
+	} {
+		if strings.Contains(text, w) {
+			return "bug"
+		}
+	}
+	for _, w := range []string{
+		"feature", "request", "please add", "would like", "wish", "should add",
+		"özellik", "ekle", "istiyorum", "olsun", "eklenmeli",
+	} {
+		if strings.Contains(text, w) {
+			return "feature"
+		}
+	}
+	for _, w := range []string{
+		"love", "great", "awesome", "excellent", "amazing", "perfect", "best", "fantastic",
+		"güzel", "harika", "mükemmel", "seviyorum", "beğendim", "süper", "muhteşem", "bayıldım",
+	} {
+		if strings.Contains(text, w) {
+			return "praise"
+		}
+	}
+	for _, w := range []string{"spam", "fake", "scam", "click here", "free money", "sahte"} {
+		if strings.Contains(text, w) {
+			return "spam"
+		}
+	}
+	if sentiment == "positive" {
+		return "praise"
+	}
+	return "other"
 }
