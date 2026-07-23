@@ -4,7 +4,7 @@
   "tags": ["llm", "monitoring"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
   "panels": [
@@ -15,7 +15,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(app_review_llm_analyze_total{status=\"success\"}[5m])) / clamp_min(sum(rate(app_review_llm_analyze_total[5m])), 0.001)",
+          "expr": "sum(increase(app_review_llm_analyze_total{status=\"success\"}[$__range])) / clamp_min(sum(increase(app_review_llm_analyze_total[$__range])), 1)",
           "legendFormat": "success rate"
         }
       ],
@@ -42,7 +42,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(app_review_auto_score_quality_sum[5m])) / clamp_min(sum(rate(app_review_auto_score_quality_count[5m])), 0.001)",
+          "expr": "sum(increase(app_review_auto_score_quality_sum[$__range])) / clamp_min(sum(increase(app_review_auto_score_quality_count[$__range])), 1)",
           "legendFormat": "avg quality"
         }
       ],
@@ -69,7 +69,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
       "targets": [
         {
-          "expr": "sum(increase(app_review_reviews_created_total[1h]))",
+          "expr": "sum(increase(app_review_reviews_created_total[$__range]))",
           "legendFormat": "reviews"
         }
       ],
@@ -78,15 +78,15 @@
     {
       "id": 4,
       "type": "stat",
-      "title": "MLC inference p95 (s)",
+      "title": "MLC inference p95",
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(app_review_llm_inference_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(increase(app_review_llm_inference_duration_seconds_bucket[$__range])) by (le))",
           "legendFormat": "p95"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 2 } }
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } }
     },
     {
       "id": 5,
@@ -95,15 +95,15 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "targets": [
         {
-          "expr": "sum(rate(app_review_llm_analyze_total{status=\"success\"}[1m]))",
+          "expr": "sum(increase(app_review_llm_analyze_total{status=\"success\"}[1m]))",
           "legendFormat": "success"
         },
         {
-          "expr": "sum(rate(app_review_llm_analyze_total{status=\"error\"}[1m]))",
+          "expr": "sum(increase(app_review_llm_analyze_total{status=\"error\"}[1m]))",
           "legendFormat": "error"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" } }
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } }
     },
     {
       "id": 6,
@@ -125,11 +125,11 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "targets": [
         {
-          "expr": "sum by (category) (rate(app_review_decisions_total[5m]))",
+          "expr": "sum by (category) (increase(app_review_decisions_total[$__range]))",
           "legendFormat": "{{category}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" } }
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } }
     },
     {
       "id": 8,

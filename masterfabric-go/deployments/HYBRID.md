@@ -56,23 +56,39 @@ Local checks:
 | http://127.0.0.1:8787/health | `{"status":"ok"}` |
 | http://127.0.0.1:3001 | Grafana (admin / admin) |
 
-## Step 2 — Cloudflare Tunnel
+## Step 2 — Cloudflare Tunnel (inferreview.com)
 
-1. Cloudflare Dashboard → **Zero Trust** → **Networks** → **Tunnels** → **Create a tunnel**
-2. Name: `mlc-hybrid`
-3. Install connector → **Docker** → copy the `TUNNEL_TOKEN` into `.env.hybrid`
-4. **Public Hostname** tab → Add route:
-   - Subdomain: `mlc` (example: `mlc.yourdomain.com`)
-   - Service: `http://mlc-gateway:80` (Docker service name, not localhost)
-5. Save and restart compose with `--profile tunnel`
+1. Zero Trust → **Free plan** → **Networks** → **Tunnels** → **Create a tunnel**
+2. Type: **Cloudflared** (not Mesh)
+3. Name: `inferreview-hybrid`
+4. Install connector → **Docker** → copy token into `.env.hybrid` as `CLOUDFLARE_TUNNEL_TOKEN`
+   - Do **not** run the standalone `docker run cloudflare/cloudflared…` command; use docker compose below
+5. **Public Hostname** tab → add routes:
+
+| Hostname | Type | URL (Docker service) |
+|----------|------|----------------------|
+| `mlc.inferreview.com` | HTTP | `mlc-gateway:80` |
+| `grafana.inferreview.com` | HTTP | `grafana:3000` |
+
+6. Start/restart compose with `--profile tunnel`
 
 Test from any browser:
 
 ```
-https://mlc.yourdomain.com/health
+https://mlc.inferreview.com/health
+https://grafana.inferreview.com
 ```
 
-Should return `{"status":"ok"}`.
+Should return `{"status":"ok"}` and Grafana login respectively.
+
+### Optional: app + API on same domain (DNS only)
+
+| Subdomain | Points to |
+|-----------|-----------|
+| `app.inferreview.com` | Vercel (custom domain) |
+| `api.inferreview.com` | Render (custom domain) |
+
+Update Render `ALLOWED_ORIGINS=https://app.inferreview.com` when frontend moves.
 
 ### Quick test without custom domain (ngrok alternative)
 
@@ -91,7 +107,7 @@ Render Dashboard → **app-review-monitoring-api** → **Environment**:
 | Key | Value |
 |-----|-------|
 | `MLC_LLM_ENABLED` | `true` |
-| `MLC_LLM_BASE_URL` | `https://mlc.yourdomain.com` |
+| `MLC_LLM_BASE_URL` | `https://mlc.inferreview.com` |
 | `MLC_LLM_API_KEY` | same as `MLC_API_KEY` in `.env.hybrid` |
 | `MLC_LLM_MODEL` | `gemma-2-2b-it-q4f16_1-MLC` (optional) |
 
@@ -121,7 +137,7 @@ Redeploy frontend. Prod dashboard will call `POST /reviews/{id}/analyze` on Rend
 4. Click **Analyze**
 5. Expected: `praise / positive` (mock rules until real MLC GPU image is used)
 
-Watch Grafana at http://127.0.0.1:3001 while testing.
+Watch Grafana at https://grafana.inferreview.com while testing (or http://127.0.0.1:3001 locally).
 
 ## Architecture notes
 
@@ -130,7 +146,7 @@ Watch Grafana at http://127.0.0.1:3001 while testing.
 | Frontend | Vercel | Yes |
 | API + Postgres | Render | Yes |
 | MLC inference | Your Docker | No (tunnel only) |
-| Grafana/Prometheus | Your Docker | No (localhost) |
+| Grafana/Prometheus | Your Docker | Tunnel: `grafana.inferreview.com` |
 
 - **Login, reviews, DB** → always Render
 - **Analyze only** → Render forwards to your MLC
