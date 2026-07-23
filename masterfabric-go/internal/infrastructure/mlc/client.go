@@ -35,10 +35,11 @@ type Classification struct {
 type Client struct {
 	baseURL    string
 	model      string
+	apiKey     string
 	httpClient *http.Client
 }
 
-func NewClient(baseURL, model string) *Client {
+func NewClient(baseURL, model, apiKey string) *Client {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if baseURL == "" {
 		baseURL = defaultBaseURL
@@ -49,9 +50,17 @@ func NewClient(baseURL, model string) *Client {
 	return &Client{
 		baseURL: baseURL,
 		model:   model,
+		apiKey:  strings.TrimSpace(apiKey),
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
+	}
+}
+
+func (c *Client) setHeaders(req *http.Request) {
+	req.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("X-MLC-API-Key", c.apiKey)
 	}
 }
 
@@ -102,7 +111,7 @@ Review: %q`, strings.Join(categories, ", "), strings.Join(sentiments, ", "), tex
 	if err != nil {
 		return Classification{}, fmt.Errorf("create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	c.setHeaders(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -160,6 +169,7 @@ func (c *Client) Health(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	c.setHeaders(req)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err

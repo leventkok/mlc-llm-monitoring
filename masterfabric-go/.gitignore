@@ -33,6 +33,7 @@ Thumbs.db
 .env.local
 .env.*.local
 deployments/.env.docker
+deployments/.env.hybrid
 
 # Vendor (optional)
 # vendor/

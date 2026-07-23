@@ -1,0 +1,65 @@
+# Hybrid stack: MLC on your machine, Render calls in via Cloudflare Tunnel.
+# Usage:
+#   cp .env.hybrid.example .env.hybrid
+#   docker compose -f docker-compose.hybrid.yml --env-file .env.hybrid up --build
+# With tunnel (after CLOUDFLARE_TUNNEL_TOKEN is set):
+#   docker compose -f docker-compose.hybrid.yml --env-file .env.hybrid --profile tunnel up --build
+
+services:
+  mlc-llm:
+    build:
+      context: ./mlc-mock
+      dockerfile: Dockerfile
+    environment:
+      MLC_API_KEY: ${MLC_API_KEY:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mlc-gateway:
+    image: nginx:1.27-alpine
+    ports:
+      - "${MLC_GATEWAY_HOST_BIND:-127.0.0.1}:${MLC_GATEWAY_PORT:-8787}:80"
+    volumes:
+      - ./nginx/mlc-gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      mlc-llm:
+        condition: service_healthy
+
+  cloudflared:
+    image: cloudflare/cloudflared:2025.2.1
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      mlc-gateway:
+        condition: service_started
+    profiles:
+      - tunnel
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    ports:
+      - "${PROMETHEUS_HOST_BIND:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus/prometheus-hybrid.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    ports:
+      - "${GRAFANA_HOST_BIND:-127.0.0.1}:${GRAFANA_PORT:-3001}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafanadata:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  grafanadata:

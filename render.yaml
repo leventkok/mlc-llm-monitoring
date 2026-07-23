@@ -17,6 +17,10 @@ services:
       - key: ALLOWED_ORIGINS
         value: https://mlc-llm-monitoring.vercel.app
       - key: MLC_LLM_ENABLED
-        value: "false"
+        sync: false
+      - key: MLC_LLM_BASE_URL
+        sync: false
+      - key: MLC_LLM_API_KEY
+        sync: false
       - key: METRICS_ENABLED
         value: "false"

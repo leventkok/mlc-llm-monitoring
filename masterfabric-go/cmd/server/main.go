@@ -163,7 +163,7 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 
 	var analyzeReviewUC *llmUC.AnalyzeReviewUseCase
 	if cfg.MLC.Enabled {
-		mlcClient := infraMLC.NewClient(cfg.MLC.BaseURL, cfg.MLC.Model)
+		mlcClient := infraMLC.NewClient(cfg.MLC.BaseURL, cfg.MLC.Model, cfg.MLC.APIKey)
 		analyzeReviewUC = llmUC.NewAnalyzeReviewUseCase(reviewRepo, mlcClient)
 		log.Info("server-side mlc inference enabled", "base_url", cfg.MLC.BaseURL, "model", cfg.MLC.Model)
 	}

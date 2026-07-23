@@ -36,11 +36,22 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
-	mux.HandleFunc("/v1/chat/completions", handleChat)
+	mux.HandleFunc("/v1/chat/completions", withAPIKey(handleChat))
 
 	log.Printf("mlc-mock listening on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func withAPIKey(next http.HandlerFunc) http.HandlerFunc {
+	expected := strings.TrimSpace(os.Getenv("MLC_API_KEY"))
+	return func(w http.ResponseWriter, r *http.Request) {
+		if expected != "" && r.Header.Get("X-MLC-API-Key") != expected {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next(w, r)
 	}
 }
 

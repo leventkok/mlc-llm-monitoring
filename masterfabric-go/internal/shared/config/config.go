@@ -107,6 +107,7 @@ type LogConfig struct {
 type MLCConfig struct {
 	BaseURL string
 	Model   string
+	APIKey  string
 	Enabled bool
 }
 
@@ -183,6 +184,7 @@ func Load() *Config {
 		MLC: MLCConfig{
 			BaseURL: envOrDefault("MLC_LLM_BASE_URL", ""),
 			Model:   envOrDefault("MLC_LLM_MODEL", "gemma-2-2b-it-q4f16_1-MLC"),
+			APIKey:  envOrDefault("MLC_LLM_API_KEY", ""),
 			Enabled: envOrDefault("MLC_LLM_ENABLED", "false") == "true" || os.Getenv("MLC_LLM_BASE_URL") != "",
 		},
 		Telemetry: TelemetryConfig{

@@ -116,7 +116,7 @@ export default function DashboardPage() {
           </h1>
           <p className="mt-1 text-sm text-muted">
             {useServerInference
-              ? "Add a review and analyze via the local Docker MLC service."
+              ? "Add a review and analyze via the server MLC service (Render → your machine)."
               : "Add a review and let Gemma classify it — running in your browser."}
           </p>
         </div>
