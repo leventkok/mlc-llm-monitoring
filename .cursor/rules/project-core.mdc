@@ -1,0 +1,18 @@
+---
+description: App Review Monitoring architecture and language conventions
+alwaysApply: true
+---
+
+# Project core
+
+- **Stack:** Next.js 16 (frontend) + Go/chi/pgx (masterfabric-go) + Docker hybrid MLC/Grafana.
+- **Live:** Vercel + Render + Cloudflare tunnel to local MLC/Grafana — treat as production.
+- **Privacy:** User reviews and decisions are per-account in Postgres; do not log secrets or raw tokens.
+- **Language:** Code comments, commits, PR titles/bodies in **English**. Chat may be Turkish.
+- **MCP:** Deferred until explicitly requested — keep REST analyze path working.
+
+```text
+✅ Frontend-only UI → no API break for live
+✅ Backend changes → go build + existing route compatibility
+❌ Commit .env.hybrid / tunnel tokens / Render secrets
+```
