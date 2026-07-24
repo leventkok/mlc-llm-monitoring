@@ -1,8 +1,11 @@
 # MCP Integration Guide
 
-This project is designed to be deployed and maintained using three MCP servers in Cursor.
+This project uses MCP in two ways:
 
-## Required MCPs
+1. **Deployment MCPs** (Render, Vercel, Academy) — operate infra from Cursor.
+2. **App MCP server** (`inferreview`) — local stdio tools over the REST API. See [MCP-APP.md](./MCP-APP.md).
+
+## Required MCPs (deployment)
 
 | MCP | Purpose |
 |-----|---------|
