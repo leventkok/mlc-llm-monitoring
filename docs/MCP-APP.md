@@ -55,8 +55,7 @@ INFERREVIEW_JWT_TOKEN=eyJ...
 ```json
 "inferreview": {
   "command": "go",
-  "args": ["run", "./cmd/mcp"],
-  "cwd": "masterfabric-go",
+  "args": ["-C", "masterfabric-go", "run", "./cmd/mcp"],
   "env": {
     "INFERREVIEW_API_URL": "https://mlc-llm-monitoring.onrender.com",
     "INFERREVIEW_EMAIL": "${env:INFERREVIEW_EMAIL}",
@@ -64,6 +63,8 @@ INFERREVIEW_JWT_TOKEN=eyJ...
   }
 }
 ```
+
+> **Windows:** Cursor may ignore `cwd` in MCP config. Use `go -C masterfabric-go` (Go 1.20+) so the module root is correct.
 
 Copy-paste starter: [examples/cursor-mcp-inferreview.json](../examples/cursor-mcp-inferreview.json)
 
