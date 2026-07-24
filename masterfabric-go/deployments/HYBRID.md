@@ -21,7 +21,7 @@ User → Vercel → Render (auth, DB, /reviews/{id}/analyze)
 - [Cloudflare](https://dash.cloudflare.com) account (free)
 - A domain on Cloudflare (or use a `*.trycloudflare.com` quick tunnel for testing)
 - Render service already deployed
-- Machine stays **on and online** while prod analyze is used
+- Machine stays **on and online** while prod analyze is used (or use [PROD.vps.md](./PROD.vps.md) for 24/7 VPS)
 
 ## Step 1 — Local hybrid stack
 

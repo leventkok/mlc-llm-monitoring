@@ -1,0 +1,16 @@
+[Unit]
+Description=InferReview production Docker stack (MLC + Grafana + Tunnel)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/inferreview/mlc-llm-monitoring/masterfabric-go/deployments
+ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml --env-file .env.prod down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
