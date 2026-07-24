@@ -110,6 +110,40 @@ Or use `local-up-hybrid.cmd`.
 | Analyze slow | Real GPU inference + tunnel latency; Render timeout is 120s |
 | Out of VRAM | Use a smaller quant model or `--device cpu` (very slow; mock is better for dev) |
 
+## PEFT / LoRA adapters
+
+MLC 0.20 merges LoRA at **convert time** (not runtime hot-swap). Adapters live on a bind-mounted volume:
+
+```
+deployments/peft-adapters/
+  raw/     ← HuggingFace PEFT LoRA dirs
+  merged/  ← MLC-quantized output (generated)
+```
+
+1. Put a LoRA trained on **gemma-2-2b-it** in `peft-adapters/raw/my-adapter/`.
+2. Merge (GPU, several minutes):
+
+   ```cmd
+   merge-lora-adapter.cmd my-adapter raw\my-adapter
+   ```
+
+3. In `.env.hybrid`:
+
+   ```env
+   MLC_LORA_ADAPTER=my-adapter
+   ```
+
+4. Recreate the engine:
+
+   ```bash
+   docker compose -f docker-compose.hybrid.yml -f docker-compose.hybrid.real-mlc.yml \
+     --env-file .env.hybrid up -d --force-recreate mlc-engine mlc-llm
+   ```
+
+5. Set Render `MLC_LLM_MODEL` to the model id printed by the merge script (check `/v1/models`).
+
+See [peft-adapters/README.md](./peft-adapters/README.md) for env vars and troubleshooting.
+
 ## Monitoring
 
 Prometheus scrapes `mlc-llm:8080/metrics` (proxy counters). Grafana dashboards work the same as the mock stack.

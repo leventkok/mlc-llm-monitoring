@@ -4,3 +4,9 @@ tmp/
 /server
 /server.exe
 .cursor/mcp.env
+
+# Local LoRA adapters and merged MLC weights (large binaries)
+masterfabric-go/deployments/peft-adapters/raw/*
+!masterfabric-go/deployments/peft-adapters/raw/.gitkeep
+masterfabric-go/deployments/peft-adapters/merged/*
+!masterfabric-go/deployments/peft-adapters/merged/.gitkeep

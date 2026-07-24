@@ -40,14 +40,16 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip \
         "mlc-llm-${MLC_WHEEL_SUFFIX}==0.20.0.dev0" \
     && python3 -m pip install --no-cache-dir \
         cloudpickle scipy tornado ml_dtypes numpy packaging typing_extensions \
-        attrs datasets fastapi flashinfer-python openai pandas prompt_toolkit \
+        attrs datasets fastapi flashinfer-python openai pandas prompt_toolkit peft \
         requests safetensors sentencepiece shortuuid tiktoken torch tqdm transformers uvicorn aiohttp pydantic \
+        huggingface_hub \
     && python3 -m pip show apache-tvm-ffi mlc-ai-${MLC_WHEEL_SUFFIX} mlc-llm-${MLC_WHEEL_SUFFIX}
 
 EXPOSE 8081
 
 COPY entrypoint.sh /usr/local/bin/mlc-engine-entrypoint.sh
-RUN sed -i 's/\r$//' /usr/local/bin/mlc-engine-entrypoint.sh \
-    && chmod +x /usr/local/bin/mlc-engine-entrypoint.sh
+COPY merge-lora-adapter.sh /usr/local/bin/merge-lora-adapter.sh
+RUN sed -i 's/\r$//' /usr/local/bin/mlc-engine-entrypoint.sh /usr/local/bin/merge-lora-adapter.sh \
+    && chmod +x /usr/local/bin/mlc-engine-entrypoint.sh /usr/local/bin/merge-lora-adapter.sh
 
 ENTRYPOINT ["/usr/local/bin/mlc-engine-entrypoint.sh"]
