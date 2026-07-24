@@ -7,10 +7,12 @@
 
 services:
   mlc-engine:
-    image: mlcaidev/mlc-llm:latest
+    build:
+      context: ./mlc-engine
+      dockerfile: Dockerfile
+      args:
+        MLC_WHEEL_SUFFIX: ${MLC_WHEEL_SUFFIX:-cu130}
     command:
-      - mlc_llm
-      - serve
       - ${MLC_MODEL:-HF://mlc-ai/gemma-2-2b-it-q4f16_1-MLC}
       - --host
       - "0.0.0.0"
@@ -20,8 +22,15 @@ services:
       - ${MLC_DEVICE:-cuda}
     environment:
       HF_HOME: /models
+      CUDA_HOME: /usr/local/cuda
+      LIBRARY_PATH: /usr/local/cuda/lib64/stubs:/usr/local/cuda/lib64
+      TORCH_CUDA_ARCH_LIST: "8.6"
+      MLC_JIT_POLICY: ${MLC_JIT_POLICY:-ON}
+      MAX_JOBS: "4"
+    shm_size: "2gb"
     volumes:
       - mlc_models:/models
+      - mlc_jit_cache:/root/.cache/mlc_llm
     expose:
       - "8081"
     deploy:
@@ -32,7 +41,7 @@ services:
               count: 1
               capabilities: [gpu]
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8081/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/v1/models || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 30
@@ -57,3 +66,4 @@ services:
 
 volumes:
   mlc_models:
+  mlc_jit_cache:

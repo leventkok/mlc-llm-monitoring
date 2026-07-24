@@ -12,7 +12,7 @@ Mock mode (default) is unchanged — only add the override file when you have a 
 
 | Service | Role |
 |---------|------|
-| `mlc-engine` | Runs `mlc_llm serve` with NVIDIA GPU |
+| `mlc-engine` | Builds from `mlc-engine/Dockerfile` — **stable** wheels `mlc-ai-cu130==0.20.0` + `mlc-llm-cu130==0.20.0.dev0` from [mlc.ai/wheels](https://mlc.ai/wheels) |
 | `mlc-llm` | **mlc-proxy** — validates `X-MLC-API-Key`, forwards `/v1/*`, exposes `/health` + `/metrics` |
 | `mlc-gateway` | Same nginx config as mock stack |
 | `cloudflared` | Same tunnel profile |
@@ -39,7 +39,10 @@ Add to `.env.hybrid` (optional — defaults are fine):
 ```env
 MLC_MODEL=HF://mlc-ai/gemma-2-2b-it-q4f16_1-MLC
 MLC_DEVICE=cuda
+MLC_WHEEL_SUFFIX=cu130
 ```
+
+Default model is **gemma-2-2b-it-q4f16_1-MLC** (same as mock stack / Render). First startup downloads ~2 GB and JIT-compiles on GPU (10–20 min). `MLC_WHEEL_SUFFIX` must match your CUDA driver (see [mlc.ai/wheels](https://mlc.ai/wheels)).
 
 `MLC_API_KEY` and `CLOUDFLARE_TUNNEL_TOKEN` are required (same as mock hybrid).
 
@@ -57,7 +60,7 @@ Windows:
 local-up-hybrid-real.cmd
 ```
 
-**First startup:** `mlc-engine` downloads the HuggingFace model. Health checks allow up to ~15 minutes (`start_period: 900s`). Watch logs:
+**First startup:** Docker builds `mlc-engine` (pip install, several minutes), then downloads the HuggingFace model. Health checks allow up to ~15 minutes (`start_period: 900s`). Watch logs:
 
 ```bash
 docker compose -f docker-compose.hybrid.yml -f docker-compose.hybrid.real-mlc.yml logs -f mlc-engine
@@ -95,8 +98,14 @@ Or use `local-up-hybrid.cmd`.
 
 | Symptom | Fix |
 |---------|-----|
+| `pull access denied for mlcaidev/mlc-llm` | Fixed — we build `mlc-engine` locally from pip wheels, not Docker Hub |
 | `mlc-engine` exits immediately | GPU not visible in Docker — check `nvidia-smi` in a `--gpus all` container |
-| Health stays `starting` for a long time | Normal on first run (model download). Check `mlc-engine` logs |
+| pip wheel / CUDA mismatch | Try `MLC_WHEEL_SUFFIX=cu128` or `cu130` in `.env.hybrid` and rebuild |
+| `No module named 'tvm'` | Rebuild `mlc-engine` — Dockerfile pins matching mlc-ai + mlc-llm wheel versions |
+| `/usr/local/cuda/bin/nvcc: not found` | Fixed — use `cuda:*-devel` base image (not `runtime`); FlashInfer JIT needs nvcc |
+| Nightly compile errors (`CallTIRRewrite`, `DataflowVar`) | Use stable wheels in Dockerfile (default since 0.20.0); avoid `mlc-*-nightly` unless you accept ~30 GB images |
+| `DataflowVar` / FlashInfer errors | Nightly-only; stable 0.20 uses runtime CUDA image, no FlashInfer JIT |
+| Health stays `starting` for a long time | Normal on first run (model download + JIT compile, 10–20 min). Check `mlc-engine` logs |
 | 403 from MLC | `MLC_LLM_API_KEY` on Render ≠ `MLC_API_KEY` in `.env.hybrid` |
 | Analyze slow | Real GPU inference + tunnel latency; Render timeout is 120s |
 | Out of VRAM | Use a smaller quant model or `--device cpu` (very slow; mock is better for dev) |
