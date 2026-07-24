@@ -60,7 +60,7 @@ func envOr(key, fallback string) string {
 
 func probeUpstream(upstream *url.URL) error {
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(upstream.String() + "/health")
+	resp, err := client.Get(upstream.String() + "/v1/models")
 	if err != nil {
 		return err
 	}
