@@ -34,8 +34,9 @@ Follow the same delivery model as [masterfabric-mac-cli](https://github.com/gurk
 3. Write **English** commit messages (Conventional Commits — see rule file).
 4. Push the branch and open an **English** PR with **Summary** + **Test plan**.
 5. Do **not** change live URLs, tunnel tokens, or deploy config without explicit user approval.
-6. Never commit secrets (`.env.hybrid`, API keys, tunnel tokens).
+6. Never commit secrets (`.env.hybrid`, API keys, tunnel tokens, `.cursor/mcp.env`).
 7. Keep PR titles, commit messages, and code comments in **English**. Chat may be Turkish.
+8. App MCP server: `masterfabric-go/cmd/mcp` — see [docs/MCP-APP.md](docs/MCP-APP.md).
 
 ## Quick verify
 

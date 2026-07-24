@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "inferreview": {
+      "command": "go",
+      "args": ["run", "./cmd/mcp"],
+      "cwd": "masterfabric-go",
+      "env": {
+        "INFERREVIEW_API_URL": "https://mlc-llm-monitoring.onrender.com",
+        "INFERREVIEW_EMAIL": "${env:INFERREVIEW_EMAIL}",
+        "INFERREVIEW_PASSWORD": "${env:INFERREVIEW_PASSWORD}"
+      }
+    }
+  }
+}
