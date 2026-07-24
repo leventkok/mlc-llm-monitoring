@@ -10,8 +10,8 @@
       "url": "https://mcp.vercel.com"
     },
     "inferreview": {
-      "command": "go",
-      "args": ["-C", "masterfabric-go", "run", "./cmd/mcp"],
+      "command": "${workspaceFolder}/.cursor/run-inferreview-mcp.cmd",
+      "args": [],
       "env": {
         "INFERREVIEW_API_URL": "https://mlc-llm-monitoring.onrender.com",
         "INFERREVIEW_EMAIL": "${env:INFERREVIEW_EMAIL}",

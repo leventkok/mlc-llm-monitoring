@@ -52,10 +52,12 @@ INFERREVIEW_JWT_TOKEN=eyJ...
 
 3. Add to `.cursor/mcp.json` (merge with existing servers):
 
+On Windows, Cursor may ignore `cwd` and `go -C`. Use the launcher script instead:
+
 ```json
 "inferreview": {
-  "command": "go",
-  "args": ["-C", "masterfabric-go", "run", "./cmd/mcp"],
+  "command": "${workspaceFolder}/.cursor/run-inferreview-mcp.cmd",
+  "args": [],
   "env": {
     "INFERREVIEW_API_URL": "https://mlc-llm-monitoring.onrender.com",
     "INFERREVIEW_EMAIL": "${env:INFERREVIEW_EMAIL}",
@@ -64,7 +66,11 @@ INFERREVIEW_JWT_TOKEN=eyJ...
 }
 ```
 
-> **Windows:** Cursor may ignore `cwd` in MCP config. Use `go -C masterfabric-go` (Go 1.20+) so the module root is correct.
+Linux/macOS alternative:
+
+```json
+"args": ["-C", "masterfabric-go", "run", "./cmd/mcp"]
+```
 
 Copy-paste starter: [examples/cursor-mcp-inferreview.json](../examples/cursor-mcp-inferreview.json)
 
