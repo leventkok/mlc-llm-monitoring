@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { reviewApi } from "@/lib/api";
 import { analyzeReview, isEngineCachedInSession, warmupEngine } from "@/lib/llm";
+import RichResult from "@/components/RichResult";
 import { Review, Decision } from "@/types";
-import { categoryBadge, sentimentBadge } from "@/lib/badges";
 
 const useServerInference =
   process.env.NEXT_PUBLIC_USE_SERVER_INFERENCE === "true";
@@ -258,28 +258,8 @@ export default function DashboardPage() {
                 </div>
 
                 {decision && (
-                  <div className="mt-4 rounded-xl border border-border bg-background p-4">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs text-muted">
-                        verdict
-                      </span>
-                      <span
-                        className={`rounded-md border px-2 py-0.5 font-mono text-xs ${categoryBadge(decision.category)}`}
-                      >
-                        {decision.category}
-                      </span>
-                      <span
-                        className={`rounded-md border px-2 py-0.5 font-mono text-xs ${sentimentBadge(decision.sentiment)}`}
-                      >
-                        {decision.sentiment}
-                      </span>
-                      <span className="ml-auto font-mono text-xs text-muted">
-                        {decision.latency_ms}ms
-                      </span>
-                    </div>
-                    <p className="break-words font-mono text-xs text-muted">
-                      {decision.raw_output}
-                    </p>
+                  <div className="rounded-xl border border-border bg-background p-4">
+                    <RichResult decision={decision} review={review} compact />
                   </div>
                 )}
               </div>
