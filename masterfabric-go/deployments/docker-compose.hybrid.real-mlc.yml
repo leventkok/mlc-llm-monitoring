@@ -1,0 +1,59 @@
+# Real MLC GPU stack — use with docker-compose.hybrid.yml (mock stays default without this file).
+#
+#   docker compose -f docker-compose.hybrid.yml -f docker-compose.hybrid.real-mlc.yml \
+#     --env-file .env.hybrid --profile tunnel up --build
+#
+# Requires NVIDIA GPU + Container Toolkit (see REAL-MLC.md).
+
+services:
+  mlc-engine:
+    image: mlcaidev/mlc-llm:latest
+    command:
+      - mlc_llm
+      - serve
+      - ${MLC_MODEL:-HF://mlc-ai/gemma-2-2b-it-q4f16_1-MLC}
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8081"
+      - --device
+      - ${MLC_DEVICE:-cuda}
+    environment:
+      HF_HOME: /models
+    volumes:
+      - mlc_models:/models
+    expose:
+      - "8081"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 900s
+
+  mlc-llm:
+    build:
+      context: ./mlc-proxy
+      dockerfile: Dockerfile
+    environment:
+      MLC_API_KEY: ${MLC_API_KEY:-}
+      MLC_UPSTREAM: http://mlc-engine:8081
+    depends_on:
+      mlc-engine:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 900s
+
+volumes:
+  mlc_models:
