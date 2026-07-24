@@ -12,7 +12,7 @@ Mock mode (default) is unchanged — only add the override file when you have a 
 
 | Service | Role |
 |---------|------|
-| `mlc-engine` | Runs `mlc_llm serve` with NVIDIA GPU |
+| `mlc-engine` | Builds from `mlc-engine/Dockerfile` (pip install from [mlc.ai/wheels](https://mlc.ai/wheels)), runs `mlc_llm serve` on NVIDIA GPU |
 | `mlc-llm` | **mlc-proxy** — validates `X-MLC-API-Key`, forwards `/v1/*`, exposes `/health` + `/metrics` |
 | `mlc-gateway` | Same nginx config as mock stack |
 | `cloudflared` | Same tunnel profile |
@@ -39,7 +39,10 @@ Add to `.env.hybrid` (optional — defaults are fine):
 ```env
 MLC_MODEL=HF://mlc-ai/gemma-2-2b-it-q4f16_1-MLC
 MLC_DEVICE=cuda
+MLC_WHEEL_SUFFIX=cu130
 ```
+
+`MLC_WHEEL_SUFFIX` must match your CUDA driver (see [mlc.ai/wheels](https://mlc.ai/wheels)). RTX 3050 4 GB VRAM is enough for `gemma-2-2b-it-q4f16_1-MLC`, but close other GPU apps first.
 
 `MLC_API_KEY` and `CLOUDFLARE_TUNNEL_TOKEN` are required (same as mock hybrid).
 
@@ -57,7 +60,7 @@ Windows:
 local-up-hybrid-real.cmd
 ```
 
-**First startup:** `mlc-engine` downloads the HuggingFace model. Health checks allow up to ~15 minutes (`start_period: 900s`). Watch logs:
+**First startup:** Docker builds `mlc-engine` (pip install, several minutes), then downloads the HuggingFace model. Health checks allow up to ~15 minutes (`start_period: 900s`). Watch logs:
 
 ```bash
 docker compose -f docker-compose.hybrid.yml -f docker-compose.hybrid.real-mlc.yml logs -f mlc-engine
@@ -95,7 +98,9 @@ Or use `local-up-hybrid.cmd`.
 
 | Symptom | Fix |
 |---------|-----|
+| `pull access denied for mlcaidev/mlc-llm` | Fixed — we build `mlc-engine` locally from pip wheels, not Docker Hub |
 | `mlc-engine` exits immediately | GPU not visible in Docker — check `nvidia-smi` in a `--gpus all` container |
+| pip wheel / CUDA mismatch | Try `MLC_WHEEL_SUFFIX=cu128` or `cu130` in `.env.hybrid` and rebuild |
 | Health stays `starting` for a long time | Normal on first run (model download). Check `mlc-engine` logs |
 | 403 from MLC | `MLC_LLM_API_KEY` on Render ≠ `MLC_API_KEY` in `.env.hybrid` |
 | Analyze slow | Real GPU inference + tunnel latency; Render timeout is 120s |

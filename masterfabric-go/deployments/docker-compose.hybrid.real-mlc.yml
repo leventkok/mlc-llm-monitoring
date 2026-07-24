@@ -7,7 +7,11 @@
 
 services:
   mlc-engine:
-    image: mlcaidev/mlc-llm:latest
+    build:
+      context: ./mlc-engine
+      dockerfile: Dockerfile
+      args:
+        MLC_WHEEL_SUFFIX: ${MLC_WHEEL_SUFFIX:-cu130}
     command:
       - mlc_llm
       - serve
