@@ -154,7 +154,16 @@ Watch Grafana at https://grafana.inferreview.com while testing (or http://127.0.
 
 ## Replace mock with real MLC
 
-In `docker-compose.hybrid.yml`, replace the `mlc-llm` build section with your GPU MLC image. Keep `MLC_LLM_BASE_URL` pointing at the tunnel hostname.
+Default compose uses **mlc-mock** (keyword rules, no GPU). For production inference on your GPU machine, add the real-MLC override — no Render or tunnel URL changes:
+
+```bash
+docker compose -f docker-compose.hybrid.yml -f docker-compose.hybrid.real-mlc.yml \
+  --env-file .env.hybrid --profile tunnel up --build
+```
+
+Windows: `local-up-hybrid-real.cmd`
+
+See **[REAL-MLC.md](./REAL-MLC.md)** for GPU prerequisites, first-run model download, and rollback to mock.
 
 ## Troubleshooting
 
