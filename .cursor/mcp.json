@@ -13,9 +13,7 @@
       "command": "${workspaceFolder}/.cursor/run-inferreview-mcp.cmd",
       "args": [],
       "env": {
-        "INFERREVIEW_API_URL": "https://mlc-llm-monitoring.onrender.com",
-        "INFERREVIEW_EMAIL": "${env:INFERREVIEW_EMAIL}",
-        "INFERREVIEW_PASSWORD": "${env:INFERREVIEW_PASSWORD}"
+        "INFERREVIEW_API_URL": "https://mlc-llm-monitoring.onrender.com"
       }
     }
   }

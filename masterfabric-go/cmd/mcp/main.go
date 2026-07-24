@@ -4,12 +4,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
+	"github.com/joho/godotenv"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 func main() {
+	loadEnv()
+
 	client, err := newAPIClient()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "inferreview MCP: %v\n", err)
@@ -143,5 +147,18 @@ func intArg(args map[string]any, key string, fallback int) int {
 		return int(v)
 	default:
 		return fallback
+	}
+}
+
+func loadEnv() {
+	candidates := []string{
+		filepath.Join("..", ".cursor", "mcp.env"),
+		filepath.Join(".cursor", "mcp.env"),
+	}
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			_ = godotenv.Load(p)
+			return
+		}
 	}
 }

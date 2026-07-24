@@ -36,40 +36,19 @@ go run ./cmd/mcp
 ## Cursor setup
 
 1. Copy [`.cursor/mcp.env.example`](../.cursor/mcp.env.example) → `.cursor/mcp.env`
-2. Set credentials (pick one auth mode):
+Credentials live in `.cursor/mcp.env` (loaded automatically on MCP startup):
 
 ```env
-INFERREVIEW_API_URL=https://mlc-llm-monitoring.onrender.com
 INFERREVIEW_EMAIL=you@example.com
 INFERREVIEW_PASSWORD=your-password
 ```
 
-Or use a JWT bearer token instead of email/password:
-
-```env
-INFERREVIEW_JWT_TOKEN=eyJ...
-```
-
-3. Add to `.cursor/mcp.json` (merge with existing servers):
-
-On Windows, Cursor may ignore `cwd` and `go -C`. Use the launcher script instead:
+Optional in `mcp.json` env block (API URL only):
 
 ```json
-"inferreview": {
-  "command": "${workspaceFolder}/.cursor/run-inferreview-mcp.cmd",
-  "args": [],
-  "env": {
-    "INFERREVIEW_API_URL": "https://mlc-llm-monitoring.onrender.com",
-    "INFERREVIEW_EMAIL": "${env:INFERREVIEW_EMAIL}",
-    "INFERREVIEW_PASSWORD": "${env:INFERREVIEW_PASSWORD}"
-  }
+"env": {
+  "INFERREVIEW_API_URL": "https://mlc-llm-monitoring.onrender.com"
 }
-```
-
-Linux/macOS alternative:
-
-```json
-"args": ["-C", "masterfabric-go", "run", "./cmd/mcp"]
 ```
 
 Copy-paste starter: [examples/cursor-mcp-inferreview.json](../examples/cursor-mcp-inferreview.json)
