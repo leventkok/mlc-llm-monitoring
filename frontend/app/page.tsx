@@ -25,13 +25,13 @@ export default function HomePage() {
     {
       href: "/dashboard",
       title: "Dashboard",
-      desc: "Add reviews and run them through the model",
+      desc: "Add reviews, analyze via MLC, and inspect rich classification results",
       tag: "analyze",
     },
     {
       href: "/monitoring",
       title: "Monitoring",
-      desc: "Track decisions, score quality, watch accuracy",
+      desc: "Compliance KPIs, quality scores, distributions, and raw LLM output",
       tag: "observe",
     },
     {
@@ -52,8 +52,8 @@ export default function HomePage() {
           App Review Monitoring
         </h1>
         <p className="mt-2 max-w-lg text-muted">
-          Classify app-store reviews with a raw language model, then observe and
-          score how well it decides.
+          Classify app-store reviews with MLC, view structured rich results on
+          the dashboard, and monitor output quality over time.
         </p>
       </div>
 
