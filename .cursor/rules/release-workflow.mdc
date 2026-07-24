@@ -1,0 +1,77 @@
+---
+description: Branch + Conventional Commits + English PR workflow (aligned with masterfabric-mac-cli)
+alwaysApply: true
+---
+
+# Git workflow — App Review Monitoring
+
+Aligned with [masterfabric-mac-cli](https://github.com/gurkanfikretgunak/masterfabric-mac-cli) (`AGENTS.md`, `release-workflow.mdc`).
+
+## Branch naming
+
+Use a short prefix + kebab-case slug:
+
+| Prefix | Use |
+|--------|-----|
+| `feat/` | New feature or UI capability |
+| `fix/` | Bug fix |
+| `chore/` | Tooling, rules, deps, docs-only maintenance |
+| `docs/` | Documentation-only (optional; `chore:` commits also OK) |
+
+Examples:
+
+- `feat/rich-result-monitoring`
+- `fix/grafana-kpi-query`
+- `chore/cursor-rules-agents-md`
+
+Work on `main` only for tiny hotfixes when the user explicitly asks.
+
+## Commit messages (English, Conventional Commits)
+
+Format:
+
+```text
+<type>(<scope>): <short imperative summary>
+```
+
+- **type:** `feat`, `fix`, `chore`, `docs`, `refactor`, `test`
+- **scope (optional):** `frontend`, `backend`, `deploy`, `grafana`, `mlc`
+- **summary:** lowercase-ish, imperative, no trailing period preferred
+- Optional body paragraph for *why* (still English)
+
+Examples (from masterfabric-mac-cli style):
+
+```text
+feat(frontend): rich result UI and expanded LLM monitoring dashboard
+fix(grafana): use increase() for analyze success rate KPI
+chore: add AGENTS.md and Cursor project rules
+docs(deploy): document inferreview.com Cloudflare tunnel routes
+```
+
+## Delivery loop (non-trivial changes)
+
+1. Create or switch to `feat/…` / `fix/…` branch.
+2. Commit with a clear English message (one logical change per commit when practical).
+3. **Push** the branch: `git push -u origin HEAD`
+4. Open PR with `gh pr create` — **English** title + body:
+
+```markdown
+## Summary
+- …
+
+## Test plan
+- [ ] …
+```
+
+5. Do **not** push directly to `main` or change Render/Vercel env unless the user asks.
+
+## Do not
+
+- Auto-deploy or change production env vars without explicit approval.
+- Commit `.env.hybrid`, `.env.prod`, API keys, or tunnel tokens.
+- Write commit messages or PR bodies in Turkish (chat may stay Turkish).
+- Skip branch workflow for multi-file features.
+
+## After merge (optional)
+
+Ask whether to deploy or tag — this repo has no semver `VERSION` file unless the user adds release tagging later.
