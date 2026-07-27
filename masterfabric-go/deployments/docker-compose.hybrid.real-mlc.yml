@@ -26,11 +26,16 @@ services:
       LIBRARY_PATH: /usr/local/cuda/lib64/stubs:/usr/local/cuda/lib64
       TORCH_CUDA_ARCH_LIST: "8.6"
       MLC_JIT_POLICY: ${MLC_JIT_POLICY:-ON}
+      MLC_LORA_ADAPTER: ${MLC_LORA_ADAPTER:-}
+      MLC_BASE_MODEL: ${MLC_BASE_MODEL:-google/gemma-2-2b-it}
+      MLC_QUANTIZATION: ${MLC_QUANTIZATION:-q4f16_1}
+      MLC_CONV_TEMPLATE: ${MLC_CONV_TEMPLATE:-gemma_instruction}
       MAX_JOBS: "4"
     shm_size: "2gb"
     volumes:
       - mlc_models:/models
       - mlc_jit_cache:/root/.cache/mlc_llm
+      - ./peft-adapters:/adapters
     expose:
       - "8081"
     deploy:
