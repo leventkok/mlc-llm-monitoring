@@ -26,6 +26,7 @@ import (
 	llmHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/llm"
 	mcpHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/mcp"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/router"
+	infraDeepWiki "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/deepwiki"
 	infraMLC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/mlc"
 	pgIam "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/iam"
 	pgLlm "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/llm"
@@ -167,14 +168,15 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 	getMetricsUC := llmUC.NewGetMetricsUseCase(reviewRepo)
 
 	var analyzeReviewUC *llmUC.AnalyzeReviewUseCase
-	var mcpHTTPHandler *mcpHandler.Handler
 	if cfg.MLC.Enabled {
 		configRepo.SetRuntimeLLM(cfg.MLC.Model, os.Getenv("MLC_LORA_ADAPTER"))
 		mlcClient := infraMLC.NewClient(cfg.MLC.BaseURL, cfg.MLC.Model, cfg.MLC.APIKey, configRepo)
 		analyzeReviewUC = llmUC.NewAnalyzeReviewUseCase(reviewRepo, mlcClient)
-		mcpHTTPHandler = mcpHandler.NewHandler(analyzeReviewUC)
 		log.Info("server-side mlc inference enabled", "base_url", cfg.MLC.BaseURL, "model", cfg.MLC.Model)
 	}
+
+	deepWikiClient := infraDeepWiki.NewClient(os.Getenv("DEEPWIKI_MCP_URL"))
+	mcpHTTPHandler := mcpHandler.NewHandler(analyzeReviewUC, deepWikiClient)
 
 	getConfigUC := configUC.NewGetConfigUseCase(configRepo)
 	updateConfigUC := configUC.NewUpdateConfigUseCase(configRepo)

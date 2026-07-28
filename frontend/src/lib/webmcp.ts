@@ -1,16 +1,22 @@
 import { request } from "./api";
 import { Decision } from "../types";
 
-/** MCP payload shape (FINAL BOSS gist — WebMCP → Go backend). */
-export type MCPPayload = {
+export type MCPAnalyzePayload = {
   action: "analyze_review";
   review_id: string;
-  query?: string;
-  spec?: Record<string, unknown>;
 };
 
-/** Rich MCP result from HandleMCPRequest. */
-export type MCPRichResult = {
+export type MCPDeepKwikiPayload = {
+  action: "deepkwiki_search";
+  query: string;
+  spec: {
+    repo: string;
+    mode?: "ask" | "structure" | "contents";
+  };
+};
+
+export type MCPAnalyzeResult = {
+  action?: "analyze_review";
   review_id?: string;
   decision_id?: string;
   category: string;
@@ -19,7 +25,16 @@ export type MCPRichResult = {
   latency_ms: number;
 };
 
-function toDecision(result: MCPRichResult): Decision {
+export type MCPDeepKwikiResult = {
+  action: "deepkwiki_search";
+  repo_name: string;
+  query?: string;
+  mode: string;
+  answer: string;
+  latency_ms: number;
+};
+
+function toDecision(result: MCPAnalyzeResult): Decision {
   return {
     id: result.decision_id ?? "",
     review_id: result.review_id ?? "",
@@ -31,15 +46,32 @@ function toDecision(result: MCPRichResult): Decision {
   };
 }
 
-/** WebMCP client — packages analyze requests as MCP payloads. */
+/** WebMCP — review classification via MCP. */
 export async function mcpAnalyzeReview(reviewId: string): Promise<Decision> {
-  const payload: MCPPayload = {
+  const payload: MCPAnalyzePayload = {
     action: "analyze_review",
     review_id: reviewId,
   };
-  const result = await request<MCPRichResult>("/mcp", {
+  const result = await request<MCPAnalyzeResult>("/mcp", {
     method: "POST",
     body: JSON.stringify(payload),
   });
   return toDecision(result);
+}
+
+/** WebMCP — DeepKwiki repo research (gist Faz 3). */
+export async function mcpDeepKwikiSearch(
+  repo: string,
+  query: string,
+  mode: "ask" | "structure" | "contents" = "ask",
+): Promise<MCPDeepKwikiResult> {
+  const payload: MCPDeepKwikiPayload = {
+    action: "deepkwiki_search",
+    query,
+    spec: { repo, mode },
+  };
+  return request<MCPDeepKwikiResult>("/mcp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
