@@ -10,10 +10,15 @@ type Payload struct {
 
 // RichResult is the enriched MCP response returned to the frontend.
 type RichResult struct {
-	ReviewID  string `json:"review_id,omitempty"`
-	Category  string `json:"category"`
-	Sentiment string `json:"sentiment"`
-	RawOutput string `json:"raw_output"`
-	LatencyMs int    `json:"latency_ms"`
+	Action     string `json:"action,omitempty"`
+	ReviewID   string `json:"review_id,omitempty"`
+	Category   string `json:"category,omitempty"`
+	Sentiment  string `json:"sentiment,omitempty"`
+	RawOutput  string `json:"raw_output,omitempty"`
+	LatencyMs  int    `json:"latency_ms,omitempty"`
 	DecisionID string `json:"decision_id,omitempty"`
+	RepoName   string `json:"repo_name,omitempty"`
+	Query      string `json:"query,omitempty"`
+	Answer     string `json:"answer,omitempty"`
+	Mode       string `json:"mode,omitempty"`
 }

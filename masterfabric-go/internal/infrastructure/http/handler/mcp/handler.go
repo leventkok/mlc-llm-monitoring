@@ -3,6 +3,7 @@ package mcp
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	mcpUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/mcp/usecase"
 	llmUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/usecase"
@@ -13,10 +14,11 @@ import (
 
 type Handler struct {
 	analyzeReviewUC *llmUC.AnalyzeReviewUseCase
+	deepWiki        mcpUC.DeepWikiQuerier
 }
 
-func NewHandler(analyzeReviewUC *llmUC.AnalyzeReviewUseCase) *Handler {
-	return &Handler{analyzeReviewUC: analyzeReviewUC}
+func NewHandler(analyzeReviewUC *llmUC.AnalyzeReviewUseCase, deepWiki mcpUC.DeepWikiQuerier) *Handler {
+	return &Handler{analyzeReviewUC: analyzeReviewUC, deepWiki: deepWiki}
 }
 
 func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -32,18 +34,24 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := mcpUC.HandleMCPRequest(r.Context(), userID, req, h.analyzeReviewUC)
+	result, err := mcpUC.HandleMCPRequest(r.Context(), userID, req, h.analyzeReviewUC, h.deepWiki)
 	if err != nil {
 		status := http.StatusBadRequest
 		switch err.Error() {
 		case "mlc inference is not configured", "inference failed":
 			status = http.StatusServiceUnavailable
+		case "deepwiki is not configured":
+			status = http.StatusServiceUnavailable
 		case "review not found":
 			status = http.StatusNotFound
 		case "decision already exists for this review":
 			status = http.StatusConflict
-		case "unsupported mcp action", "review_id is required":
+		case "unsupported mcp action", "review_id is required", "spec.repo is required (owner/name)", "query is required for ask mode":
 			status = http.StatusBadRequest
+		default:
+			if strings.Contains(err.Error(), "Error fetching wiki") || strings.Contains(err.Error(), "Repository not found") {
+				status = http.StatusNotFound
+			}
 		}
 		response.LegacyError(w, status, err.Error())
 		return
