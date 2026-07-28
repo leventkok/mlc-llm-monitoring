@@ -11,9 +11,12 @@ import (
 
 	configHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/config"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/health"
+	adminHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/admin"
 	iamHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/iam"
 	llmHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/llm"
+	mcpHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/mcp"
 	infraAuth "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/auth"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/iam/repository"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/middleware"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/response"
 )
@@ -30,6 +33,9 @@ type Dependencies struct {
 	IAMHandler    *iamHandler.Handler
 	LLMHandler    *llmHandler.Handler
 	ConfigHandler *configHandler.Handler
+	AdminHandler  *adminHandler.Handler
+	MCPHandler    *mcpHandler.Handler
+	UserRepo      repository.UserRepository
 	MetricsHandler http.Handler
 }
 
@@ -92,6 +98,23 @@ func New(deps Dependencies) http.Handler {
 			r.Get("/scores", deps.LLMHandler.ListScores)
 			r.Post("/scores", deps.LLMHandler.CreateScore)
 			r.Get("/stats", deps.LLMHandler.GetMetrics)
+		})
+	}
+
+	if deps.MCPHandler != nil {
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.LegacyAuth(deps.AppJWT))
+			r.Post("/mcp", deps.MCPHandler.Handle)
+		})
+	}
+
+	if deps.AdminHandler != nil && deps.UserRepo != nil {
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.LegacyAuth(deps.AppJWT))
+			r.Use(middleware.LegacyRequireAdmin(deps.UserRepo))
+			r.Get("/admin/llm-config", deps.AdminHandler.GetLLMConfig)
+			r.Put("/admin/llm-config", deps.AdminHandler.UpdateLLMConfig)
+			r.Get("/admin/analyze-logs", deps.AdminHandler.AnalyzeLogs)
 		})
 	}
 

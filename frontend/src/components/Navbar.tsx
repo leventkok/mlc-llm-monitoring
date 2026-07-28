@@ -18,6 +18,7 @@ export default function Navbar() {
     { href: "/dashboard", label: "Dashboard" },
     { href: "/monitoring", label: "Monitoring" },
     { href: "/settings", label: "Settings" },
+    ...(user.is_admin ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
   return (
