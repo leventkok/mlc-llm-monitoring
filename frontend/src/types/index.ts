@@ -78,3 +78,26 @@ export interface AnalyzeLogEntry {
   status: string;
   error?: string;
 }
+
+export interface ModelProfile {
+  id: string;
+  label: string;
+  request_model: string;
+  engine_model: string;
+  local_adapter: string;
+  description?: string;
+}
+
+export interface ModelSwitchRequest {
+  id: string;
+  profile_id: string;
+  request_model: string;
+  engine_model: string;
+  local_adapter: string;
+  status: "pending" | "running" | "completed" | "failed";
+  error_message?: string;
+  requested_by?: string;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+}

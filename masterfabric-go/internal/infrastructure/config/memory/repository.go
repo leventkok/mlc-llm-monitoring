@@ -66,6 +66,14 @@ func (s *ConfigRepo) SetRuntimeLLM(activeModel, activeAdapter string) {
 	}
 }
 
+func (s *ConfigRepo) SwitchLLM(activeModel, activeAdapter string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.llm.ActiveModel = strings.TrimSpace(activeModel)
+	s.llm.ActiveAdapter = strings.TrimSpace(activeAdapter)
+	s.config.Model = s.llm.ActiveModel
+}
+
 func validateLLM(c model.LLMConfig) error {
 	if strings.TrimSpace(c.SystemPrompt) == "" {
 		return errors.New("system_prompt is required")

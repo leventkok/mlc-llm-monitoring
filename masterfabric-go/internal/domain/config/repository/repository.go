@@ -9,4 +9,5 @@ type ConfigRepository interface {
 	GetLLM() model.LLMConfig
 	UpdateLLM(cfg model.LLMConfig) (model.LLMConfig, error)
 	SetRuntimeLLM(activeModel, activeAdapter string)
+	SwitchLLM(activeModel, activeAdapter string)
 }

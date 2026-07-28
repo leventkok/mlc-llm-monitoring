@@ -3,6 +3,7 @@ package router
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -12,6 +13,7 @@ import (
 	configHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/config"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/health"
 	adminHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/admin"
+	agentHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/agent"
 	iamHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/iam"
 	llmHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/llm"
 	mcpHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/mcp"
@@ -34,6 +36,8 @@ type Dependencies struct {
 	LLMHandler    *llmHandler.Handler
 	ConfigHandler *configHandler.Handler
 	AdminHandler  *adminHandler.Handler
+	AgentHandler  *agentHandler.Handler
+	MLCAPIKey     string
 	MCPHandler    *mcpHandler.Handler
 	UserRepo      repository.UserRepository
 	MetricsHandler http.Handler
@@ -115,6 +119,17 @@ func New(deps Dependencies) http.Handler {
 			r.Get("/admin/llm-config", deps.AdminHandler.GetLLMConfig)
 			r.Put("/admin/llm-config", deps.AdminHandler.UpdateLLMConfig)
 			r.Get("/admin/analyze-logs", deps.AdminHandler.AnalyzeLogs)
+			r.Get("/admin/model-profiles", deps.AdminHandler.ListModelProfiles)
+			r.Post("/admin/switch-model", deps.AdminHandler.SwitchModel)
+			r.Get("/admin/model-switch/status", deps.AdminHandler.ModelSwitchStatus)
+		})
+	}
+
+	if deps.AgentHandler != nil && strings.TrimSpace(deps.MLCAPIKey) != "" {
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.RequireMLCAPIKey(deps.MLCAPIKey))
+			r.Get("/agent/model-switch/next", deps.AgentHandler.ClaimNext)
+			r.Post("/agent/model-switch/{id}/report", deps.AgentHandler.Report)
 		})
 	}
 

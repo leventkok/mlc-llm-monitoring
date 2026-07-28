@@ -8,6 +8,8 @@ import {
   Metrics,
   LLMConfig,
   AnalyzeLogEntry,
+  ModelProfile,
+  ModelSwitchRequest,
 } from "../types";
 
 const PRODUCTION_API_URL = "https://mlc-llm-monitoring.onrender.com";
@@ -131,4 +133,15 @@ export const adminApi = {
 
   analyzeLogs: (limit = 50) =>
     request<AnalyzeLogEntry[]>(`/admin/analyze-logs?limit=${limit}`),
+
+  modelProfiles: () => request<ModelProfile[]>("/admin/model-profiles"),
+
+  switchModel: (profileId: string) =>
+    request<ModelSwitchRequest>("/admin/switch-model", {
+      method: "POST",
+      body: JSON.stringify({ profile_id: profileId }),
+    }),
+
+  modelSwitchStatus: () =>
+    request<ModelSwitchRequest | null>("/admin/model-switch/status"),
 };

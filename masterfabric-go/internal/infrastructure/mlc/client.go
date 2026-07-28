@@ -109,10 +109,14 @@ func (c *Client) buildPrompt(text string) string {
 func (c *Client) ClassifyReview(ctx context.Context, text string) (Classification, error) {
 	start := time.Now()
 	s := c.llmSettings()
+	modelID := c.model
+	if m := strings.TrimSpace(s.ActiveModel); m != "" {
+		modelID = m
+	}
 	prompt := c.buildPrompt(text)
 
 	body, err := json.Marshal(chatRequest{
-		Model: c.model,
+		Model: modelID,
 		Messages: []chatMessage{
 			{Role: "user", Content: prompt},
 		},

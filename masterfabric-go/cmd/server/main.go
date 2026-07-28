@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	iamUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/iam/usecase"
 	configUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/config/usecase"
+	configModel "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/config/model"
 	llmUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/usecase"
 	infraAuth "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/auth"
 	memConfig "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/config/memory"
@@ -24,10 +25,12 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/health"
 	iamHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/iam"
 	llmHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/llm"
+	agentHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/agent"
 	mcpHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/mcp"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/router"
 	infraDeepWiki "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/deepwiki"
 	infraMLC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/mlc"
+	pgConfig "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/config"
 	pgIam "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/iam"
 	pgLlm "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/llm"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/config"
@@ -168,8 +171,14 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 	getMetricsUC := llmUC.NewGetMetricsUseCase(reviewRepo)
 
 	var analyzeReviewUC *llmUC.AnalyzeReviewUseCase
+	switchRepo := pgConfig.NewSwitchRepo(db)
 	if cfg.MLC.Enabled {
 		configRepo.SetRuntimeLLM(cfg.MLC.Model, os.Getenv("MLC_LORA_ADAPTER"))
+		if latest, err := switchRepo.GetLatest(context.Background()); err == nil && latest != nil &&
+			latest.Status == configModel.SwitchStatusCompleted {
+			configRepo.SwitchLLM(latest.RequestModel, latest.LocalAdapter)
+			log.Info("restored active model from last switch", "profile", latest.ProfileID, "model", latest.RequestModel)
+		}
 		mlcClient := infraMLC.NewClient(cfg.MLC.BaseURL, cfg.MLC.Model, cfg.MLC.APIKey, configRepo)
 		analyzeReviewUC = llmUC.NewAnalyzeReviewUseCase(reviewRepo, mlcClient)
 		log.Info("server-side mlc inference enabled", "base_url", cfg.MLC.BaseURL, "model", cfg.MLC.Model)
@@ -182,6 +191,10 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 	updateConfigUC := configUC.NewUpdateConfigUseCase(configRepo)
 	getLLMConfigUC := configUC.NewGetLLMConfigUseCase(configRepo)
 	updateLLMConfigUC := configUC.NewUpdateLLMConfigUseCase(configRepo)
+	listProfilesUC := configUC.NewListModelProfilesUseCase(nil)
+	switchModelUC := configUC.NewSwitchModelUseCase(listProfilesUC, configRepo, switchRepo)
+	switchStatusUC := configUC.NewGetModelSwitchStatusUseCase(switchRepo)
+	agentSwitchUC := configUC.NewAgentModelSwitchUseCase(switchRepo)
 
 	return router.Dependencies{
 		Logger:             log,
@@ -201,7 +214,11 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 			createScoreUC, listScoresUC, getMetricsUC,
 		),
 		ConfigHandler: configHandler.NewHandler(getConfigUC, updateConfigUC),
-		AdminHandler:  adminHandler.NewHandler(getLLMConfigUC, updateLLMConfigUC),
+		AdminHandler: adminHandler.NewHandler(
+			getLLMConfigUC, updateLLMConfigUC, listProfilesUC, switchModelUC, switchStatusUC,
+		),
+		AgentHandler:  agentHandler.NewHandler(agentSwitchUC),
+		MLCAPIKey:     cfg.MLC.APIKey,
 		MCPHandler:    mcpHTTPHandler,
 	}
 }

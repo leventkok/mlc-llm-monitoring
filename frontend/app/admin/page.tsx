@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/context/AuthContext";
 import { adminApi } from "@/lib/api";
-import { AnalyzeLogEntry, LLMConfig } from "@/types";
+import { AnalyzeLogEntry, LLMConfig, ModelProfile, ModelSwitchRequest } from "@/types";
 import { useRouter } from "next/navigation";
 
 const defaultLLM: LLMConfig = {
@@ -25,6 +25,19 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [profiles, setProfiles] = useState<ModelProfile[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState("");
+  const [switchStatus, setSwitchStatus] = useState<ModelSwitchRequest | null>(null);
+  const [switching, setSwitching] = useState(false);
+
+  const loadSwitchStatus = useCallback(async () => {
+    try {
+      const status = await adminApi.modelSwitchStatus();
+      setSwitchStatus(status);
+    } catch {
+      /* optional poll */
+    }
+  }, []);
 
   useEffect(() => {
     if (user && !user.is_admin) {
@@ -37,16 +50,30 @@ export default function AdminPage() {
     void loadAll();
   }, [user]);
 
+  useEffect(() => {
+    if (!user?.is_admin) return;
+    const id = setInterval(() => void loadSwitchStatus(), 5000);
+    return () => clearInterval(id);
+  }, [user, loadSwitchStatus]);
+
   async function loadAll() {
     setLoading(true);
     setError("");
     try {
-      const [cfg, entries] = await Promise.all([
+      const [cfg, entries, profs, sw] = await Promise.all([
         adminApi.getLLMConfig(),
         adminApi.analyzeLogs(50),
+        adminApi.modelProfiles(),
+        adminApi.modelSwitchStatus(),
       ]);
       setLLM(cfg);
       setLogs(entries);
+      setProfiles(profs);
+      setSwitchStatus(sw);
+      if (!selectedProfile && profs.length > 0) {
+        const active = profs.find((p) => p.request_model === cfg.active_model);
+        setSelectedProfile(active?.id ?? profs[0].id);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load admin data");
     } finally {
@@ -67,6 +94,26 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSwitchModel() {
+    if (!selectedProfile) return;
+    setSwitching(true);
+    setMessage("");
+    setError("");
+    try {
+      const req = await adminApi.switchModel(selectedProfile);
+      setSwitchStatus(req);
+      const cfg = await adminApi.getLLMConfig();
+      setLLM(cfg);
+      setMessage(
+        "Model switch queued — mlc-agent will restart the local engine (2–15 min JIT). Prompt/temperature already live."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Switch failed");
+    } finally {
+      setSwitching(false);
     }
   }
 
@@ -91,8 +138,9 @@ export default function AdminPage() {
             LLM cockpit
           </h1>
           <p className="mt-2 text-sm text-muted">
-            Live prompt and inference limits (no model restart). Adapter hot-swap
-            requires MLC convert + engine restart — see status below.
+            Live prompt and inference limits apply instantly. Model adapter swap
+            queues a local engine restart via mlc-agent (MLC 0.20 merges LoRA at
+            convert time).
           </p>
         </header>
 
@@ -111,11 +159,66 @@ export default function AdminPage() {
                   value={llm.active_adapter || "(merged in model weights)"}
                 />
               </dl>
-              <p className="mt-4 text-xs text-muted">
-                To switch adapters: merge LoRA in Colab or locally, upload to HF,
-                update <code className="text-foreground">MLC_MODEL</code> and restart{" "}
-                <code className="text-foreground">mlc-engine</code>.
-              </p>
+
+              <div className="mt-6 space-y-3 border-t border-border pt-5">
+                <h3 className="font-mono text-xs font-medium uppercase text-muted">
+                  Hot-swap model profile
+                </h3>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <label className="block flex-1 text-xs text-muted">
+                    Profile
+                    <select
+                      value={selectedProfile}
+                      onChange={(e) => setSelectedProfile(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm text-foreground"
+                    >
+                      {profiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={switching || !selectedProfile}
+                    onClick={() => void handleSwitchModel()}
+                    className="rounded-lg border border-accent px-4 py-2 text-sm font-medium text-accent disabled:opacity-50"
+                  >
+                    {switching ? "Queuing…" : "Switch model"}
+                  </button>
+                </div>
+                {profiles.find((p) => p.id === selectedProfile)?.description && (
+                  <p className="text-xs text-muted">
+                    {profiles.find((p) => p.id === selectedProfile)?.description}
+                  </p>
+                )}
+                {switchStatus && (
+                  <div className="rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs">
+                    <span className="text-muted">Last switch: </span>
+                    <span
+                      className={
+                        switchStatus.status === "completed"
+                          ? "text-emerald-500"
+                          : switchStatus.status === "failed"
+                            ? "text-red-500"
+                            : "text-amber-500"
+                      }
+                    >
+                      {switchStatus.status}
+                    </span>
+                    <span className="text-muted"> · {switchStatus.profile_id}</span>
+                    {switchStatus.error_message && (
+                      <p className="mt-1 text-red-500">{switchStatus.error_message}</p>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-muted">
+                  Requires <code className="text-foreground">mlc-agent</code> in the
+                  real-mlc hybrid stack. API model id updates immediately; GPU
+                  weights reload after engine restart.
+                </p>
+              </div>
             </section>
 
             <form
