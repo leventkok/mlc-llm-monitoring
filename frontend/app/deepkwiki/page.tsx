@@ -41,8 +41,8 @@ export default function DeepKwikiPage() {
           </h1>
           <p className="mt-2 text-sm text-muted">
             WebMCP packages your query → Go backend → DeepWiki MCP (
-            <code className="text-foreground">mcp.deepwiki.com</code>). Use public{" "}
-            <code className="text-foreground">owner/repo</code> slugs.
+            <code className="text-foreground">mcp.deepwiki.com</code>). Responses
+            usually take 10–25 seconds.
           </p>
         </header>
 

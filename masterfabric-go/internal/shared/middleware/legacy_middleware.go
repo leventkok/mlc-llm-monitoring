@@ -85,11 +85,32 @@ func SecurityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// RequestTimeoutLegacy applies a 10s timeout to requests.
+// RequestTimeoutLegacy applies a default timeout; slow inference/research routes get longer limits.
 func RequestTimeoutLegacy(next http.Handler) http.Handler {
+	const (
+		defaultTimeout = 10 * time.Second
+		slowTimeout    = 28 * time.Second // Render free tier ~30s HTTP cap
+	)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		limit := defaultTimeout
+		if slowLegacyRequest(r) {
+			limit = slowTimeout
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), limit)
 		defer cancel()
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func slowLegacyRequest(r *http.Request) bool {
+	if r.Method == http.MethodPost && r.URL.Path == "/mcp" {
+		return true
+	}
+	if r.Method != http.MethodPost {
+		return false
+	}
+	if !strings.HasPrefix(r.URL.Path, "/reviews/") {
+		return false
+	}
+	return strings.HasSuffix(r.URL.Path, "/analyze")
 }
