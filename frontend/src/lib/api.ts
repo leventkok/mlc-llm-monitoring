@@ -6,6 +6,8 @@ import {
   Decision,
   Score,
   Metrics,
+  LLMConfig,
+  AnalyzeLogEntry,
 } from "../types";
 
 const PRODUCTION_API_URL = "https://mlc-llm-monitoring.onrender.com";
@@ -14,7 +16,7 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   (process.env.VERCEL === "1" ? PRODUCTION_API_URL : "http://localhost:8080");
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
@@ -116,4 +118,17 @@ export const reviewApi = {
 
   analyze: (reviewId: string) =>
     request<Decision>(`/reviews/${reviewId}/analyze`, { method: "POST" }),
+};
+
+export const adminApi = {
+  getLLMConfig: () => request<LLMConfig>("/admin/llm-config"),
+
+  updateLLMConfig: (cfg: Partial<LLMConfig>) =>
+    request<LLMConfig>("/admin/llm-config", {
+      method: "PUT",
+      body: JSON.stringify(cfg),
+    }),
+
+  analyzeLogs: (limit = 50) =>
+    request<AnalyzeLogEntry[]>(`/admin/analyze-logs?limit=${limit}`),
 };

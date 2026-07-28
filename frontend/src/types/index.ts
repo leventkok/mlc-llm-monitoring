@@ -2,6 +2,7 @@ export interface User {
   id: string;
   email: string;
   username: string;
+  is_admin?: boolean;
 }
 
 export interface RegisterCredentials {
@@ -56,4 +57,24 @@ export interface Metrics {
   avg_quality: number;
   avg_latency_ms: number;
   accuracy_pct: number;
+}
+
+export interface LLMConfig {
+  system_prompt: string;
+  temperature: number;
+  max_tokens: number;
+  top_p: number;
+  active_model: string;
+  active_adapter: string;
+}
+
+export interface AnalyzeLogEntry {
+  time: string;
+  user_id: string;
+  review_id: string;
+  category?: string;
+  sentiment?: string;
+  latency_ms?: number;
+  status: string;
+  error?: string;
 }

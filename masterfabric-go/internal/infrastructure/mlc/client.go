@@ -10,18 +10,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/config/model"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/validate"
 )
 
-const (
-	defaultBaseURL = "http://mlc-llm:8080"
-	defaultModel   = "gemma-2-2b-it-q4f16_1-MLC"
-)
+const defaultBaseURL = "http://mlc-llm:8080"
 
 var (
-	categories  = []string{"bug", "feature", "praise", "spam", "other"}
-	sentiments  = []string{"positive", "negative", "neutral"}
+	categories = []string{"bug", "feature", "praise", "spam", "other"}
+	sentiments = []string{"positive", "negative", "neutral"}
 )
+
+// LLMSettingsReader supplies runtime LLM parameters (admin panel).
+type LLMSettingsReader interface {
+	GetLLM() model.LLMConfig
+}
 
 // Classification is the parsed LLM output for a review.
 type Classification struct {
@@ -36,21 +39,23 @@ type Client struct {
 	baseURL    string
 	model      string
 	apiKey     string
+	settings   LLMSettingsReader
 	httpClient *http.Client
 }
 
-func NewClient(baseURL, model, apiKey string) *Client {
+func NewClient(baseURL, model, apiKey string, settings LLMSettingsReader) *Client {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if baseURL == "" {
 		baseURL = defaultBaseURL
 	}
 	if model == "" {
-		model = defaultModel
+		model = "gemma-2-2b-it-q4f16_1-MLC"
 	}
 	return &Client{
-		baseURL: baseURL,
-		model:   model,
-		apiKey:  strings.TrimSpace(apiKey),
+		baseURL:  baseURL,
+		model:    model,
+		apiKey:   strings.TrimSpace(apiKey),
+		settings: settings,
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
@@ -68,6 +73,7 @@ type chatRequest struct {
 	Model       string        `json:"model"`
 	Messages    []chatMessage `json:"messages"`
 	Temperature float64       `json:"temperature"`
+	TopP        float64       `json:"top_p,omitempty"`
 	MaxTokens   int           `json:"max_tokens"`
 }
 
@@ -84,38 +90,35 @@ type chatResponse struct {
 	} `json:"choices"`
 }
 
+func (c *Client) llmSettings() model.LLMConfig {
+	if c.settings != nil {
+		return c.settings.GetLLM()
+	}
+	return model.DefaultLLMConfig(c.model, "")
+}
+
+func (c *Client) buildPrompt(text string) string {
+	s := c.llmSettings()
+	base := strings.TrimSpace(s.SystemPrompt)
+	if base == "" {
+		base = model.DefaultSystemPrompt
+	}
+	return base + "\n\nReview: " + fmt.Sprintf("%q", text)
+}
+
 func (c *Client) ClassifyReview(ctx context.Context, text string) (Classification, error) {
 	start := time.Now()
-
-	prompt := fmt.Sprintf(`You are a strict classifier for app store reviews (any language).
-Classify into exactly one category and one sentiment.
-Categories: %s.
-Sentiments: %s.
-
-Rules:
-- Match the reviewer's tone: complaints and dissatisfaction → negative; compliments → positive; factual/neutral → neutral.
-- bug: crashes, errors, broken or slow functionality.
-- feature: requests for new capability.
-- praise: explicit compliments.
-- spam: promotional junk or fake reviews.
-- other: general feedback that does not fit above (still use the correct sentiment).
-
-Examples:
-{"category":"bug","sentiment":"negative"} — "App keeps crashing"
-{"category":"other","sentiment":"negative"} — "This app is terrible" / "Kötü bir uygulama"
-{"category":"praise","sentiment":"positive"} — "Love this app!"
-
-Respond with ONLY a JSON object and nothing else.
-
-Review: %q`, strings.Join(categories, ", "), strings.Join(sentiments, ", "), text)
+	s := c.llmSettings()
+	prompt := c.buildPrompt(text)
 
 	body, err := json.Marshal(chatRequest{
 		Model: c.model,
 		Messages: []chatMessage{
 			{Role: "user", Content: prompt},
 		},
-		Temperature: 0,
-		MaxTokens:   60,
+		Temperature: s.Temperature,
+		TopP:        s.TopP,
+		MaxTokens:   s.MaxTokens,
 	})
 	if err != nil {
 		return Classification{}, fmt.Errorf("marshal chat request: %w", err)

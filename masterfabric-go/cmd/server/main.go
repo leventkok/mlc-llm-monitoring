@@ -19,10 +19,12 @@ import (
 	llmUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/usecase"
 	infraAuth "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/auth"
 	memConfig "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/config/memory"
+	adminHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/admin"
 	configHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/config"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/health"
 	iamHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/iam"
 	llmHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/llm"
+	mcpHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/mcp"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/router"
 	infraMLC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/mlc"
 	pgIam "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/iam"
@@ -165,14 +167,19 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 	getMetricsUC := llmUC.NewGetMetricsUseCase(reviewRepo)
 
 	var analyzeReviewUC *llmUC.AnalyzeReviewUseCase
+	var mcpHTTPHandler *mcpHandler.Handler
 	if cfg.MLC.Enabled {
-		mlcClient := infraMLC.NewClient(cfg.MLC.BaseURL, cfg.MLC.Model, cfg.MLC.APIKey)
+		configRepo.SetRuntimeLLM(cfg.MLC.Model, os.Getenv("MLC_LORA_ADAPTER"))
+		mlcClient := infraMLC.NewClient(cfg.MLC.BaseURL, cfg.MLC.Model, cfg.MLC.APIKey, configRepo)
 		analyzeReviewUC = llmUC.NewAnalyzeReviewUseCase(reviewRepo, mlcClient)
+		mcpHTTPHandler = mcpHandler.NewHandler(analyzeReviewUC)
 		log.Info("server-side mlc inference enabled", "base_url", cfg.MLC.BaseURL, "model", cfg.MLC.Model)
 	}
 
 	getConfigUC := configUC.NewGetConfigUseCase(configRepo)
 	updateConfigUC := configUC.NewUpdateConfigUseCase(configRepo)
+	getLLMConfigUC := configUC.NewGetLLMConfigUseCase(configRepo)
+	updateLLMConfigUC := configUC.NewUpdateLLMConfigUseCase(configRepo)
 
 	return router.Dependencies{
 		Logger:             log,
@@ -182,6 +189,7 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 		MetricsEnabled:     metricsEnabled,
 		AppJWT:             appJWT,
 		MetricsHandler:     metricsHandler,
+		UserRepo:           userRepo,
 		IAMHandler: iamHandler.NewHandler(
 			registerUC, loginUC, getMeUC, updateMeUC, deleteMeUC, refreshUC, changePasswordUC,
 		),
@@ -191,5 +199,7 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 			createScoreUC, listScoresUC, getMetricsUC,
 		),
 		ConfigHandler: configHandler.NewHandler(getConfigUC, updateConfigUC),
+		AdminHandler:  adminHandler.NewHandler(getLLMConfigUC, updateLLMConfigUC),
+		MCPHandler:    mcpHTTPHandler,
 	}
 }

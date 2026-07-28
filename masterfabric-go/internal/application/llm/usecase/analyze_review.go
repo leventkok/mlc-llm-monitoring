@@ -9,6 +9,7 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/llm/repository"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/mlc"
 	pgLlm "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/llm"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/analyzelog"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/metrics"
 )
 
@@ -42,6 +43,12 @@ func (uc *AnalyzeReviewUseCase) Execute(ctx context.Context, userID, reviewID st
 	classification, err := uc.classifier.ClassifyReview(ctx, review.Text)
 	if err != nil {
 		metrics.RecordAnalyzeError()
+		analyzelog.Record(analyzelog.Entry{
+			UserID:   userID,
+			ReviewID: reviewID,
+			Status:   "error",
+			Error:    err.Error(),
+		})
 		return model.Decision{}, errors.New("inference failed")
 	}
 
@@ -58,5 +65,13 @@ func (uc *AnalyzeReviewUseCase) Execute(ctx context.Context, userID, reviewID st
 	}
 
 	metrics.RecordAnalyzeSuccess(classification.LatencyMs)
+	analyzelog.Record(analyzelog.Entry{
+		UserID:    userID,
+		ReviewID:  reviewID,
+		Category:  decision.Category,
+		Sentiment: decision.Sentiment,
+		LatencyMs: classification.LatencyMs,
+		Status:    "success",
+	})
 	return decision, nil
 }

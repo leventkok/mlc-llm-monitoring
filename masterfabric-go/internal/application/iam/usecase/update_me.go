@@ -8,6 +8,7 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/iam/dto"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/iam/repository"
 	pgIam "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/iam"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/admin"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/validate"
 )
 
@@ -45,5 +46,10 @@ func (uc *UpdateMeUseCase) Execute(ctx context.Context, userID string, req dto.U
 		return dto.UserResponse{}, errors.New("could not be updated")
 	}
 
-	return dto.UserResponse{ID: user.ID.String(), Email: user.Email, Username: user.Username}, nil
+	return dto.UserResponse{
+		ID:       user.ID.String(),
+		Email:    user.Email,
+		Username: user.Username,
+		IsAdmin:  admin.IsAdmin(user.Username),
+	}, nil
 }

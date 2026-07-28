@@ -8,6 +8,7 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/iam/dto"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/iam/repository"
 	domainErr "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/errors"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/admin"
 )
 
 type GetMeUseCase struct {
@@ -36,5 +37,10 @@ func (uc *GetMeUseCase) Execute(ctx context.Context, userID string) (dto.UserRes
 		return dto.UserResponse{}, errors.New("user not found")
 	}
 
-	return dto.UserResponse{ID: user.ID.String(), Email: user.Email, Username: user.Username}, nil
+	return dto.UserResponse{
+		ID:       user.ID.String(),
+		Email:    user.Email,
+		Username: user.Username,
+		IsAdmin:  admin.IsAdmin(user.Username),
+	}, nil
 }

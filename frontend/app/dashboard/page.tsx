@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { reviewApi } from "@/lib/api";
+import { mcpAnalyzeReview } from "@/lib/webmcp";
 import { analyzeReview, isEngineCachedInSession, warmupEngine } from "@/lib/llm";
 import RichResult from "@/components/RichResult";
 import { Review, Decision } from "@/types";
@@ -84,7 +85,7 @@ export default function DashboardPage() {
     setError("");
     try {
       if (useServerInference) {
-        const decision = await reviewApi.analyze(review.id);
+        const decision = await mcpAnalyzeReview(review.id);
         setDecisions((prev) => ({ ...prev, [review.id]: decision }));
       } else {
         const result = await analyzeReview(review.text);
