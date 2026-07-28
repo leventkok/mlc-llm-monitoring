@@ -137,7 +137,7 @@ func Load() *Config {
 			Host:               envOrDefault("SERVER_HOST", "0.0.0.0"),
 			Port:               envOrDefaultInt("PORT", envOrDefaultInt("SERVER_PORT", 8080)),
 			ReadTimeout:        time.Duration(envOrDefaultInt("SERVER_READ_TIMEOUT_SECONDS", 15)) * time.Second,
-			WriteTimeout:       time.Duration(envOrDefaultInt("SERVER_WRITE_TIMEOUT_SECONDS", 15)) * time.Second,
+			WriteTimeout:       time.Duration(envOrDefaultInt("SERVER_WRITE_TIMEOUT_SECONDS", 120)) * time.Second,
 			IdleTimeout:        time.Duration(envOrDefaultInt("SERVER_IDLE_TIMEOUT_SECONDS", 60)) * time.Second,
 			CORSAllowedOrigins: corsOrigins,
 			MaxBodyBytes:       envOrDefaultInt64("MAX_BODY_BYTES", 1<<20),
