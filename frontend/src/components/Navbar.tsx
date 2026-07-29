@@ -16,6 +16,7 @@ export default function Navbar() {
   const links = [
     { href: "/", label: "Home" },
     { href: "/dashboard", label: "Dashboard" },
+    { href: "/dataset", label: "Dataset" },
     { href: "/deepkwiki", label: "DeepKwiki" },
     { href: "/monitoring", label: "Monitoring" },
     { href: "/settings", label: "Settings" },

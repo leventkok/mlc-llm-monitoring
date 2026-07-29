@@ -10,11 +10,13 @@ import {
   AnalyzeLogEntry,
   ModelProfile,
   ModelSwitchRequest,
+  DatasetReviewPage,
+  BatchAnalyzeResult,
 } from "../types";
 
 const PRODUCTION_API_URL = "https://mlc-llm-monitoring.onrender.com";
 
-const API_URL =
+export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   (process.env.VERCEL === "1" ? PRODUCTION_API_URL : "http://localhost:8080");
 
@@ -144,4 +146,42 @@ export const adminApi = {
 
   modelSwitchStatus: () =>
     request<ModelSwitchRequest | null>("/admin/model-switch/status"),
+};
+
+async function requestText(path: string): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { credentials: "include" });
+  } catch {
+    throw new Error(
+      "Could not reach the API. Check NEXT_PUBLIC_API_URL and that the backend is running.",
+    );
+  }
+  if (!res.ok) {
+    let message = "Something went wrong";
+    try {
+      const data = (await res.json()) as { error?: string };
+      message = data.error || message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new Error(message);
+  }
+  return res.text();
+}
+
+export const datasetApi = {
+  list: (offset = 0, limit = 20) =>
+    request<DatasetReviewPage>(
+      `/dataset/reviews?offset=${offset}&limit=${limit}`,
+    ),
+
+  exportCSV: (offset = 0, limit = 100) =>
+    requestText(`/dataset/reviews.csv?offset=${offset}&limit=${limit}`),
+
+  batchAnalyze: (offset = 0, limit = 10) =>
+    request<BatchAnalyzeResult>(
+      `/dataset/batch-analyze?offset=${offset}&limit=${limit}`,
+      { method: "POST" },
+    ),
 };

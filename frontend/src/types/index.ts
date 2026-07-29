@@ -101,3 +101,40 @@ export interface ModelSwitchRequest {
   updated_at: string;
   completed_at?: string;
 }
+
+export interface DatasetReviewRow {
+  review_id: string;
+  store: string;
+  app_name: string;
+  app_version: string;
+  rating: number;
+  text: string;
+  language: string;
+  category?: string;
+  sentiment?: string;
+}
+
+export interface DatasetReviewPage {
+  dataset_id: string;
+  offset: number;
+  limit: number;
+  rows: DatasetReviewRow[];
+}
+
+export interface BatchAnalyzeItem {
+  review_id: string;
+  text: string;
+  expected_category?: string;
+  expected_sentiment?: string;
+  category: string;
+  sentiment: string;
+  match: boolean;
+  latency_ms: number;
+}
+
+export interface BatchAnalyzeResult {
+  dataset_id: string;
+  processed: number;
+  accuracy_pct: number;
+  items: BatchAnalyzeItem[];
+}

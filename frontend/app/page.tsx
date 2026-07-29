@@ -29,6 +29,12 @@ export default function HomePage() {
       tag: "analyze",
     },
     {
+      href: "/dataset",
+      title: "Dataset",
+      desc: "Browse Hugging Face review corpus, export CSV, and batch-evaluate MLC accuracy",
+      tag: "hf hub",
+    },
+    {
       href: "/monitoring",
       title: "Monitoring",
       desc: "Compliance KPIs, quality scores, distributions, and raw LLM output",
