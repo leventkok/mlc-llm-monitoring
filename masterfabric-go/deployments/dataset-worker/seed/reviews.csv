@@ -1,0 +1,241 @@
+review_id,store,app_name,app_version,rating,text,language,category,sentiment
+REV-0001,google_play,InferReview Demo,1.4.1,2,Bildirimler hiç gelmiyor artık,tr,bug,negative
+REV-0002,app_store,InferReview Demo,1.3.0,4,A tablet-optimized layout would be nice,en,feature,neutral
+REV-0003,google_play,InferReview Demo,1.3.0,2,Fotoğraf yüklerken uygulama çöküyor,tr,bug,negative
+REV-0004,google_play,InferReview Demo,1.3.0,1,Dosya eklemeye çalışınca çöküyor,tr,bug,negative
+REV-0005,app_store,InferReview Demo,1.3.0,3,Karanlık mod eklenirse harika olur,tr,feature,neutral
+REV-0006,google_play,InferReview Demo,1.3.2,3,FIRST!!!,en,spam,neutral
+REV-0007,app_store,InferReview Demo,1.4.1,1,Bedava telefon için linke tıkla,tr,spam,neutral
+REV-0008,app_store,InferReview Demo,1.3.2,3,Please support multiple accounts,en,feature,neutral
+REV-0009,app_store,InferReview Demo,1.3.2,2,Nothing special but it does the job,en,other,neutral
+REV-0010,app_store,InferReview Demo,1.4.0,3,Occasional lag but still usable,en,bug,neutral
+REV-0011,google_play,InferReview Demo,1.4.0,3,An option to change the font size would help,en,feature,neutral
+REV-0012,app_store,InferReview Demo,1.3.2,1,Bedava telefon için linke tıkla,tr,spam,neutral
+REV-0013,app_store,InferReview Demo,1.3.2,3,"Minor glitches here and there, nothing major",en,bug,neutral
+REV-0014,app_store,InferReview Demo,1.3.0,1,Notifications completely stopped working,en,bug,negative
+REV-0015,google_play,InferReview Demo,1.4.1,3,Tablet için uygun bir arayüz ekleyin,tr,feature,neutral
+REV-0016,app_store,InferReview Demo,1.4.0,5,"Love it, would be perfect with widgets",en,feature,positive
+REV-0017,google_play,InferReview Demo,1.3.0,2,"Black screen after the latest update, unusable",en,bug,negative
+REV-0018,app_store,InferReview Demo,1.4.1,3,Would love a home screen widget,en,feature,neutral
+REV-0019,app_store,InferReview Demo,1.4.0,5,"Exactly what I needed, works perfectly",en,praise,positive
+REV-0020,app_store,InferReview Demo,1.4.1,3,Ucuz takipçi burada indirim var,tr,spam,neutral
+REV-0021,app_store,InferReview Demo,1.3.2,4,"Excellente application, tres fluide",other,praise,positive
+REV-0022,app_store,InferReview Demo,1.4.1,5,"Exactly what I needed, works perfectly",en,praise,positive
+REV-0023,google_play,InferReview Demo,1.4.1,2,Bataryayı çok yiyor ve telefonu ısıtıyor,tr,bug,negative
+REV-0024,app_store,InferReview Demo,1.4.0,4,"Love it, would be perfect with widgets",en,feature,positive
+REV-0025,google_play,InferReview Demo,1.4.0,5,"Basit ve güvenilir, beş yıldız",tr,praise,positive
+REV-0026,google_play,InferReview Demo,1.4.0,2,Fena sayılmaz ama harika da değil,tr,other,neutral
+REV-0027,google_play,InferReview Demo,1.3.2,3,Loads slowly but eventually works,en,bug,neutral
+REV-0028,app_store,InferReview Demo,1.4.1,3,"Average app, neither good nor bad",en,other,neutral
+REV-0029,app_store,InferReview Demo,1.4.1,5,Beni takip edin geri takip garanti,tr,spam,neutral
+REV-0030,google_play,InferReview Demo,1.3.0,4,"Çok iyi, widget desteği eklenirse mükemmel olur",tr,feature,positive
+REV-0031,app_store,InferReview Demo,1.3.2,5,"Fantastic experience, no complaints at all",en,praise,positive
+REV-0032,google_play,InferReview Demo,1.4.0,2,Ödeme ekranı sürekli hata veriyor,tr,bug,negative
+REV-0033,google_play,InferReview Demo,1.4.0,2,Bildirimler hiç gelmiyor artık,tr,bug,negative
+REV-0034,app_store,InferReview Demo,1.4.0,3,"Ne iyi ne kötü, ortalama",tr,other,neutral
+REV-0035,app_store,InferReview Demo,1.3.0,2,Güncellemeden sonra sürekli donuyor,tr,bug,negative
+REV-0036,app_store,InferReview Demo,1.3.2,3,Nothing special but it does the job,en,other,neutral
+REV-0037,app_store,InferReview Demo,1.4.1,4,Tablet için uygun bir arayüz ekleyin,tr,feature,neutral
+REV-0038,google_play,InferReview Demo,1.4.0,1,Bildirimler hiç gelmiyor artık,tr,bug,negative
+REV-0039,app_store,InferReview Demo,1.3.2,3,FIRST!!!,en,spam,neutral
+REV-0040,app_store,InferReview Demo,1.4.0,4,"Çok iyi, widget desteği eklenirse mükemmel olur",tr,feature,positive
+REV-0041,app_store,InferReview Demo,1.3.0,4,Needs a proper landscape mode,en,feature,neutral
+REV-0042,app_store,InferReview Demo,1.3.2,2,Keeps freezing when I open my profile,en,bug,negative
+REV-0043,app_store,InferReview Demo,1.3.0,3,Not sure how I feel about it yet,en,other,neutral
+REV-0044,google_play,InferReview Demo,1.4.1,1,App crashes on startup every single time,en,bug,negative
+REV-0045,google_play,InferReview Demo,1.4.0,2,Güncellemeden sonra sürekli donuyor,tr,bug,negative
+REV-0046,app_store,InferReview Demo,1.3.0,5,Beni takip edin geri takip garanti,tr,spam,neutral
+REV-0047,app_store,InferReview Demo,1.3.0,4,Dark mode would be a great addition,en,feature,neutral
+REV-0048,google_play,InferReview Demo,1.3.2,3,Küçük hatalar var ama kullanılabiliyor,tr,bug,neutral
+REV-0049,app_store,InferReview Demo,1.3.0,1,My data disappears after I close the app,en,bug,negative
+REV-0050,app_store,InferReview Demo,1.4.1,5,"Smooth, stable and beautifully designed",en,praise,positive
+REV-0051,app_store,InferReview Demo,1.4.1,3,Needs a proper landscape mode,en,feature,neutral
+REV-0052,app_store,InferReview Demo,1.4.1,1,Son güncellemeden sonra kullanılamaz oldu,tr,bug,negative
+REV-0053,google_play,InferReview Demo,1.3.0,1,"Black screen after the latest update, unusable",en,bug,negative
+REV-0054,google_play,InferReview Demo,1.3.2,3,Would love a home screen widget,en,feature,neutral
+REV-0055,app_store,InferReview Demo,1.3.2,1,Login button does nothing after the update,en,bug,negative
+REV-0056,google_play,InferReview Demo,1.3.0,2,Bildirimler hiç gelmiyor artık,tr,bug,negative
+REV-0057,app_store,InferReview Demo,1.3.0,2,Senkronizasyon bir türlü tamamlanmıyor,tr,bug,negative
+REV-0058,google_play,InferReview Demo,1.4.1,3,"Freezes sometimes, a restart fixes it",en,bug,neutral
+REV-0059,app_store,InferReview Demo,1.4.0,4,Please add a search filter for the list,en,feature,neutral
+REV-0060,google_play,InferReview Demo,1.3.2,5,"Absolutely love it, works flawlessly",en,praise,positive
+REV-0061,app_store,InferReview Demo,1.3.2,5,"Basit ve güvenilir, beş yıldız",tr,praise,positive
+REV-0062,app_store,InferReview Demo,1.3.2,1,Bedava altın için kanalıma bakın!!!,tr,spam,neutral
+REV-0063,app_store,InferReview Demo,1.3.2,4,Listeye arama filtresi eklenmeli,tr,feature,neutral
+REV-0064,app_store,InferReview Demo,1.4.0,5,Visit getrichquick dot example now,en,spam,neutral
+REV-0065,google_play,InferReview Demo,1.4.1,2,Constant crashes since the 1.4.0 update,en,bug,negative
+REV-0066,google_play,InferReview Demo,1.4.1,5,"Absolutely love it, works flawlessly",en,praise,positive
+REV-0067,app_store,InferReview Demo,1.3.0,4,"Average app, neither good nor bad",en,other,neutral
+REV-0068,app_store,InferReview Demo,1.4.0,1,Güncellemeden sonra sürekli donuyor,tr,bug,negative
+REV-0069,google_play,InferReview Demo,1.3.2,4,Please add a search filter for the list,en,feature,neutral
+REV-0070,google_play,InferReview Demo,1.3.0,5,"İşimi çok kolaylaştırdı, mükemmel",tr,praise,positive
+REV-0071,app_store,InferReview Demo,1.3.0,5,"Akıcı ve stabil, hiçbir sorun yok",tr,praise,positive
+REV-0072,app_store,InferReview Demo,1.4.1,1,Search crashes the whole app instantly,en,bug,negative
+REV-0073,app_store,InferReview Demo,1.4.1,3,Çevrimdışı kullanım desteği ekleyin lütfen,tr,feature,neutral
+REV-0074,google_play,InferReview Demo,1.4.1,5,"Tam aradığım uygulama, kusursuz çalışıyor",tr,praise,positive
+REV-0075,app_store,InferReview Demo,1.4.0,1,Crashes when I try to attach a file,en,bug,negative
+REV-0076,app_store,InferReview Demo,1.3.2,2,Bildirimler hiç gelmiyor artık,tr,bug,negative
+REV-0077,google_play,InferReview Demo,1.4.1,1,Payment screen throws an error every time,en,bug,negative
+REV-0078,google_play,InferReview Demo,1.3.0,2,Güncellemeden sonra sürekli donuyor,tr,bug,negative
+REV-0079,google_play,InferReview Demo,1.4.1,2,"Average app, neither good nor bad",en,other,neutral
+REV-0080,app_store,InferReview Demo,1.4.1,1,Arama yapınca uygulama kapanıyor,tr,bug,negative
+REV-0081,app_store,InferReview Demo,1.4.0,2,"Black screen after the latest update, unusable",en,bug,negative
+REV-0082,google_play,InferReview Demo,1.4.1,1,Constant crashes since the 1.4.0 update,en,bug,negative
+REV-0083,google_play,InferReview Demo,1.3.2,3,Beni takip edin geri takip garanti,tr,spam,neutral
+REV-0084,app_store,InferReview Demo,1.4.1,1,Bedava altın için kanalıma bakın!!!,tr,spam,neutral
+REV-0085,google_play,InferReview Demo,1.3.2,3,Buy cheap followers here cheap cheap,other,spam,neutral
+REV-0086,google_play,InferReview Demo,1.3.0,1,Fotoğraf yüklerken uygulama çöküyor,tr,bug,negative
+REV-0087,google_play,InferReview Demo,1.3.0,5,"Absolutely love it, works flawlessly",en,praise,positive
+REV-0088,app_store,InferReview Demo,1.3.2,5,"Great update, everything runs smoothly now",en,praise,positive
+REV-0089,google_play,InferReview Demo,1.4.0,2,Verilerim habire kayboluyor,tr,bug,negative
+REV-0090,app_store,InferReview Demo,1.3.2,1,App won't load past the splash screen,en,bug,negative
+REV-0091,google_play,InferReview Demo,1.3.2,3,asdasd deneme yazısı 123,tr,spam,neutral
+REV-0092,google_play,InferReview Demo,1.3.0,5,Very intuitive and easy to use,en,praise,positive
+REV-0093,app_store,InferReview Demo,1.4.0,4,Yatay ekran modu gerekli,tr,feature,neutral
+REV-0094,app_store,InferReview Demo,1.3.0,5,"Basit ve güvenilir, beş yıldız",tr,praise,positive
+REV-0095,app_store,InferReview Demo,1.4.1,3,Tablet için uygun bir arayüz ekleyin,tr,feature,neutral
+REV-0096,app_store,InferReview Demo,1.4.1,3,Ucuz takipçi burada indirim var,tr,spam,neutral
+REV-0097,google_play,InferReview Demo,1.4.1,4,"Just downloaded, will update my review later",en,other,neutral
+REV-0098,app_store,InferReview Demo,1.3.2,1,Son güncellemeden sonra kullanılamaz oldu,tr,bug,negative
+REV-0099,google_play,InferReview Demo,1.4.1,5,"Great app, please add a dark mode too",en,feature,positive
+REV-0100,google_play,InferReview Demo,1.4.0,5,Win a free phone click the link,en,spam,neutral
+REV-0101,google_play,InferReview Demo,1.4.1,4,Would love a home screen widget,en,feature,neutral
+REV-0102,app_store,InferReview Demo,1.4.1,1,My data disappears after I close the app,en,bug,negative
+REV-0103,google_play,InferReview Demo,1.4.0,2,Not sure how I feel about it yet,en,other,neutral
+REV-0104,google_play,InferReview Demo,1.3.0,5,"Best app ever, highly recommend",en,praise,positive
+REV-0105,google_play,InferReview Demo,1.3.2,1,Keeps freezing when I open my profile,en,bug,negative
+REV-0106,app_store,InferReview Demo,1.4.1,3,Çoklu hesap desteği eklenmeli,tr,feature,neutral
+REV-0107,google_play,InferReview Demo,1.4.1,1,asdasd deneme yazısı 123,tr,spam,neutral
+REV-0108,google_play,InferReview Demo,1.4.0,4,An option to change the font size would help,en,feature,neutral
+REV-0109,google_play,InferReview Demo,1.4.0,5,"Muy buena aplicacion, la recomiendo",other,praise,positive
+REV-0110,app_store,InferReview Demo,1.3.0,5,"Great update, everything runs smoothly now",en,praise,positive
+REV-0111,google_play,InferReview Demo,1.3.2,2,Güncellemeden sonra sürekli donuyor,tr,bug,negative
+REV-0112,app_store,InferReview Demo,1.3.0,5,Super clean design and really fast,en,praise,positive
+REV-0113,google_play,InferReview Demo,1.4.0,3,Please support multiple accounts,other,feature,neutral
+REV-0114,google_play,InferReview Demo,1.3.0,3,"Just downloaded, will update my review later",en,other,neutral
+REV-0115,google_play,InferReview Demo,1.4.0,5,"Tasarımı çok temiz, ellerinize sağlık",tr,praise,positive
+REV-0116,google_play,InferReview Demo,1.3.2,5,"İşimi çok kolaylaştırdı, mükemmel",tr,praise,positive
+REV-0117,google_play,InferReview Demo,1.3.2,4,"Works well, an export option would top it off",en,feature,positive
+REV-0118,google_play,InferReview Demo,1.4.1,1,Payment screen throws an error every time,en,bug,negative
+REV-0119,app_store,InferReview Demo,1.3.2,5,"Akıcı ve stabil, hiçbir sorun yok",tr,praise,positive
+REV-0120,google_play,InferReview Demo,1.4.0,4,"Just downloaded, will update my review later",en,other,neutral
+REV-0121,app_store,InferReview Demo,1.3.0,2,App drains battery and overheats my phone,en,bug,negative
+REV-0122,google_play,InferReview Demo,1.4.0,1,Keeps freezing when I open my profile,en,bug,negative
+REV-0123,google_play,InferReview Demo,1.4.1,4,Needs a proper landscape mode,en,feature,neutral
+REV-0124,app_store,InferReview Demo,1.4.1,3,DM me for promo codes,en,spam,neutral
+REV-0125,google_play,InferReview Demo,1.4.0,5,"Love it, would be perfect with widgets",other,feature,positive
+REV-0126,google_play,InferReview Demo,1.3.0,5,Very intuitive and easy to use,en,praise,positive
+REV-0127,google_play,InferReview Demo,1.4.0,2,App crashes on startup every single time,en,bug,negative
+REV-0128,google_play,InferReview Demo,1.4.1,4,Dark mode would be a great addition,en,feature,neutral
+REV-0129,google_play,InferReview Demo,1.4.1,2,Sync fails and shows an endless loading spinner,en,bug,negative
+REV-0130,app_store,InferReview Demo,1.3.2,3,"Esta bien, nada especial",other,other,neutral
+REV-0131,google_play,InferReview Demo,1.3.2,5,Super clean design and really fast,en,praise,positive
+REV-0132,google_play,InferReview Demo,1.3.0,1,Constant crashes since the 1.4.0 update,en,bug,negative
+REV-0133,google_play,InferReview Demo,1.4.1,4,"Fantastic experience, no complaints at all",en,praise,positive
+REV-0134,google_play,InferReview Demo,1.4.0,3,Needs a proper landscape mode,en,feature,neutral
+REV-0135,app_store,InferReview Demo,1.4.0,3,Add the ability to export my data,en,feature,neutral
+REV-0136,google_play,InferReview Demo,1.3.2,3,Bedava telefon için linke tıkla,tr,spam,neutral
+REV-0137,app_store,InferReview Demo,1.4.0,3,Buy cheap followers here cheap cheap,en,spam,neutral
+REV-0138,google_play,InferReview Demo,1.4.1,2,Senkronizasyon bir türlü tamamlanmıyor,tr,bug,negative
+REV-0139,google_play,InferReview Demo,1.4.0,2,Keeps freezing when I open my profile,en,bug,negative
+REV-0140,app_store,InferReview Demo,1.3.2,5,"Tam aradığım uygulama, kusursuz çalışıyor",tr,praise,positive
+REV-0141,app_store,InferReview Demo,1.4.0,5,"Süper uygulama, bir de karanlık mod olsa",tr,feature,positive
+REV-0142,google_play,InferReview Demo,1.4.0,2,Notifications completely stopped working,en,bug,negative
+REV-0143,app_store,InferReview Demo,1.4.0,4,Ortalama bir uygulama işte,tr,other,neutral
+REV-0144,google_play,InferReview Demo,1.4.0,4,This app completely changed my workflow,en,praise,positive
+REV-0145,app_store,InferReview Demo,1.4.1,3,Küçük hatalar var ama kullanılabiliyor,tr,bug,neutral
+REV-0146,google_play,InferReview Demo,1.3.2,2,Beni sürekli hesaptan atıyor,tr,bug,negative
+REV-0147,app_store,InferReview Demo,1.4.0,5,Bedava altın için kanalıma bakın!!!,tr,spam,neutral
+REV-0148,app_store,InferReview Demo,1.3.2,4,"Love it, would be perfect with widgets",en,feature,positive
+REV-0149,app_store,InferReview Demo,1.4.1,3,"Bazen takılıyor, yeniden açınca düzeliyor",tr,bug,neutral
+REV-0150,google_play,InferReview Demo,1.3.2,5,"Akıcı ve stabil, hiçbir sorun yok",tr,praise,positive
+REV-0151,google_play,InferReview Demo,1.4.0,4,Tablet için uygun bir arayüz ekleyin,tr,feature,neutral
+REV-0152,google_play,InferReview Demo,1.4.1,5,Very intuitive and easy to use,en,praise,positive
+REV-0153,app_store,InferReview Demo,1.3.0,4,"It's fine, nothing to complain about",en,other,neutral
+REV-0154,app_store,InferReview Demo,1.4.1,3,Karanlık mod eklenirse harika olur,tr,feature,neutral
+REV-0155,google_play,InferReview Demo,1.4.0,2,"Photos won't upload, it just spins forever",en,bug,negative
+REV-0156,app_store,InferReview Demo,1.4.0,3,"Minor glitches here and there, nothing major",en,bug,neutral
+REV-0157,app_store,InferReview Demo,1.4.0,3,"Minor glitches here and there, nothing major",en,bug,neutral
+REV-0158,app_store,InferReview Demo,1.3.2,2,Güncellemeden sonra sürekli donuyor,tr,bug,negative
+REV-0159,app_store,InferReview Demo,1.3.2,1,App crashes on startup every single time,en,bug,negative
+REV-0160,app_store,InferReview Demo,1.4.0,1,Sync fails and shows an endless loading spinner,en,bug,negative
+REV-0161,app_store,InferReview Demo,1.3.2,3,"Freezes sometimes, a restart fixes it",en,bug,neutral
+REV-0162,google_play,InferReview Demo,1.3.2,1,Açılış ekranında takılıp kalıyor,tr,bug,negative
+REV-0163,app_store,InferReview Demo,1.3.2,4,Karanlık mod eklenirse harika olur,tr,feature,neutral
+REV-0164,app_store,InferReview Demo,1.4.0,3,FIRST!!!,en,spam,neutral
+REV-0165,app_store,InferReview Demo,1.4.0,5,"Absolutely love it, works flawlessly",en,praise,positive
+REV-0166,google_play,InferReview Demo,1.3.0,3,"Minor glitches here and there, nothing major",en,bug,neutral
+REV-0167,google_play,InferReview Demo,1.3.2,3,"Meh, it's okay I guess",en,other,neutral
+REV-0168,google_play,InferReview Demo,1.3.2,5,"Harika bir uygulama, kesinlikle tavsiye ederim",tr,praise,positive
+REV-0169,app_store,InferReview Demo,1.3.2,1,It logs me out randomly and loses everything,en,bug,negative
+REV-0170,google_play,InferReview Demo,1.3.0,2,My data disappears after I close the app,en,bug,negative
+REV-0171,app_store,InferReview Demo,1.3.0,5,"Muhteşem, hiçbir eksiği yok",tr,praise,positive
+REV-0172,app_store,InferReview Demo,1.3.2,4,"Smooth, stable and beautifully designed",en,praise,positive
+REV-0173,app_store,InferReview Demo,1.4.0,1,App crashes on startup every single time,en,bug,negative
+REV-0174,app_store,InferReview Demo,1.4.1,2,"Black screen after the latest update, unusable",en,bug,negative
+REV-0175,google_play,InferReview Demo,1.3.0,5,"Akıcı ve stabil, hiçbir sorun yok",tr,praise,positive
+REV-0176,google_play,InferReview Demo,1.3.0,2,Son güncellemeden sonra kullanılamaz oldu,tr,bug,negative
+REV-0177,google_play,InferReview Demo,1.3.2,4,Super clean design and really fast,en,praise,positive
+REV-0178,google_play,InferReview Demo,1.4.0,5,"Tam aradığım uygulama, kusursuz çalışıyor",tr,praise,positive
+REV-0179,google_play,InferReview Demo,1.4.0,2,Keeps freezing when I open my profile,en,bug,negative
+REV-0180,google_play,InferReview Demo,1.3.0,4,Tablet için uygun bir arayüz ekleyin,tr,feature,neutral
+REV-0181,app_store,InferReview Demo,1.3.2,1,App won't load past the splash screen,en,bug,negative
+REV-0182,app_store,InferReview Demo,1.4.0,3,An option to change the font size would help,en,feature,neutral
+REV-0183,google_play,InferReview Demo,1.3.0,2,"Sürekli çöküyor, çok sinir bozucu",tr,bug,negative
+REV-0184,google_play,InferReview Demo,1.4.0,3,Add fingerprint login please,en,feature,neutral
+REV-0185,app_store,InferReview Demo,1.3.0,4,"Süper uygulama, bir de karanlık mod olsa",tr,feature,positive
+REV-0186,app_store,InferReview Demo,1.4.1,3,"Minor glitches here and there, nothing major",en,bug,neutral
+REV-0187,app_store,InferReview Demo,1.3.2,2,"Sürekli çöküyor, çok sinir bozucu",tr,bug,negative
+REV-0188,google_play,InferReview Demo,1.3.0,4,"Just downloaded, will update my review later",en,other,neutral
+REV-0189,google_play,InferReview Demo,1.4.1,1,Die App sturzt standig ab nach dem Update,other,bug,negative
+REV-0190,google_play,InferReview Demo,1.4.0,1,Login button does nothing after the update,en,bug,negative
+REV-0191,google_play,InferReview Demo,1.4.1,1,Die App sturzt standig ab nach dem Update,other,bug,negative
+REV-0192,app_store,InferReview Demo,1.4.0,5,"Works well, an export option would top it off",en,feature,positive
+REV-0193,app_store,InferReview Demo,1.3.2,4,Fena sayılmaz ama harika da değil,tr,other,neutral
+REV-0194,google_play,InferReview Demo,1.3.0,3,"Meh, it's okay I guess",en,other,neutral
+REV-0195,app_store,InferReview Demo,1.3.2,2,Beni sürekli hesaptan atıyor,tr,bug,negative
+REV-0196,app_store,InferReview Demo,1.4.0,3,Bedava altın için kanalıma bakın!!!,tr,spam,neutral
+REV-0197,google_play,InferReview Demo,1.3.2,3,"It's fine, nothing to complain about",en,other,neutral
+REV-0198,google_play,InferReview Demo,1.4.1,3,Occasional lag but still usable,en,bug,neutral
+REV-0199,app_store,InferReview Demo,1.3.0,3,Win a free phone click the link,en,spam,neutral
+REV-0200,google_play,InferReview Demo,1.4.1,1,Notifications completely stopped working,en,bug,negative
+REV-0201,google_play,InferReview Demo,1.4.0,3,"It's fine, nothing to complain about",en,other,neutral
+REV-0202,google_play,InferReview Demo,1.3.0,4,"Sehr gute App, funktioniert einwandfrei",other,praise,positive
+REV-0203,app_store,InferReview Demo,1.3.2,1,"Black screen after the latest update, unusable",en,bug,negative
+REV-0204,google_play,InferReview Demo,1.3.0,3,Beni takip edin geri takip garanti,tr,spam,neutral
+REV-0205,google_play,InferReview Demo,1.4.1,2,App won't load past the splash screen,en,bug,negative
+REV-0206,app_store,InferReview Demo,1.4.0,1,Notifications completely stopped working,en,bug,negative
+REV-0207,app_store,InferReview Demo,1.4.1,4,"Basit ve güvenilir, beş yıldız",tr,praise,positive
+REV-0208,google_play,InferReview Demo,1.4.1,3,Karanlık mod eklenirse harika olur,tr,feature,neutral
+REV-0209,google_play,InferReview Demo,1.3.2,1,Uygulama açılır açılmaz kapanıyor,tr,bug,negative
+REV-0210,google_play,InferReview Demo,1.3.2,3,Would love a home screen widget,en,feature,neutral
+REV-0211,app_store,InferReview Demo,1.4.0,3,"Just downloaded, will update my review later",en,other,neutral
+REV-0212,google_play,InferReview Demo,1.3.0,4,"Exactly what I needed, works perfectly",en,praise,positive
+REV-0213,app_store,InferReview Demo,1.4.1,5,"Sehr gute App, funktioniert einwandfrei",other,praise,positive
+REV-0214,google_play,InferReview Demo,1.4.1,5,"Smooth, stable and beautifully designed",en,praise,positive
+REV-0215,google_play,InferReview Demo,1.4.0,3,Occasional lag but still usable,en,bug,neutral
+REV-0216,google_play,InferReview Demo,1.4.1,4,"Çok iyi, widget desteği eklenirse mükemmel olur",tr,feature,positive
+REV-0217,app_store,InferReview Demo,1.4.1,4,"Average app, neither good nor bad",en,other,neutral
+REV-0218,app_store,InferReview Demo,1.4.1,5,"Absolutely love it, works flawlessly",en,praise,positive
+REV-0219,app_store,InferReview Demo,1.4.1,5,"Süper uygulama, bir de karanlık mod olsa",tr,feature,positive
+REV-0220,google_play,InferReview Demo,1.4.1,2,Keeps freezing when I open my profile,en,bug,negative
+REV-0221,app_store,InferReview Demo,1.4.1,1,App won't load past the splash screen,en,bug,negative
+REV-0222,google_play,InferReview Demo,1.4.1,2,Bataryayı çok yiyor ve telefonu ısıtıyor,tr,bug,negative
+REV-0223,google_play,InferReview Demo,1.4.0,1,Açılış ekranında takılıp kalıyor,tr,bug,negative
+REV-0224,google_play,InferReview Demo,1.3.2,3,Ara sıra donuyor ama idare eder,tr,bug,neutral
+REV-0225,google_play,InferReview Demo,1.3.2,3,Please support multiple accounts,en,feature,neutral
+REV-0226,google_play,InferReview Demo,1.3.2,5,"Çok kullanışlı ve hızlı, bayıldım",tr,praise,positive
+REV-0227,app_store,InferReview Demo,1.3.2,1,Son güncellemeden sonra kullanılamaz oldu,tr,bug,negative
+REV-0228,app_store,InferReview Demo,1.3.2,4,Please add offline support,en,feature,neutral
+REV-0229,google_play,InferReview Demo,1.3.2,4,"Şimdilik normal, bir fikrim yok",tr,other,neutral
+REV-0230,google_play,InferReview Demo,1.4.1,5,"Kullanımı çok kolay, çok memnunum",tr,praise,positive
+REV-0231,google_play,InferReview Demo,1.3.2,2,Verilerim habire kayboluyor,tr,bug,negative
+REV-0232,app_store,InferReview Demo,1.4.0,5,"Fantastic experience, no complaints at all",en,praise,positive
+REV-0233,app_store,InferReview Demo,1.3.0,1,Constant crashes since the 1.4.0 update,en,bug,negative
+REV-0234,app_store,InferReview Demo,1.4.1,1,Notifications completely stopped working,en,bug,negative
+REV-0235,google_play,InferReview Demo,1.4.0,3,Occasional lag but still usable,en,bug,neutral
+REV-0236,app_store,InferReview Demo,1.4.1,1,Payment screen throws an error every time,en,bug,negative
+REV-0237,app_store,InferReview Demo,1.3.2,5,"Fantastic experience, no complaints at all",en,praise,positive
+REV-0238,app_store,InferReview Demo,1.4.1,1,Verilerim habire kayboluyor,tr,bug,negative
+REV-0239,app_store,InferReview Demo,1.3.0,2,Senkronizasyon bir türlü tamamlanmıyor,tr,bug,negative
+REV-0240,app_store,InferReview Demo,1.3.0,5,"Best app ever, highly recommend",en,praise,positive

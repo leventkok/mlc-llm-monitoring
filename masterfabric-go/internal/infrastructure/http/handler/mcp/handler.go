@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	datasetUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/dataset/usecase"
 	mcpUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/mcp/usecase"
 	llmUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/usecase"
 	mcpModel "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/mcp/model"
@@ -15,10 +16,19 @@ import (
 type Handler struct {
 	analyzeReviewUC *llmUC.AnalyzeReviewUseCase
 	deepWiki        mcpUC.DeepWikiQuerier
+	batchDatasetUC  *datasetUC.BatchAnalyzeDatasetUseCase
 }
 
-func NewHandler(analyzeReviewUC *llmUC.AnalyzeReviewUseCase, deepWiki mcpUC.DeepWikiQuerier) *Handler {
-	return &Handler{analyzeReviewUC: analyzeReviewUC, deepWiki: deepWiki}
+func NewHandler(
+	analyzeReviewUC *llmUC.AnalyzeReviewUseCase,
+	deepWiki mcpUC.DeepWikiQuerier,
+	batchDatasetUC *datasetUC.BatchAnalyzeDatasetUseCase,
+) *Handler {
+	return &Handler{
+		analyzeReviewUC: analyzeReviewUC,
+		deepWiki:        deepWiki,
+		batchDatasetUC:  batchDatasetUC,
+	}
 }
 
 func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +44,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := mcpUC.HandleMCPRequest(r.Context(), userID, req, h.analyzeReviewUC, h.deepWiki)
+	result, err := mcpUC.HandleMCPRequest(r.Context(), userID, req, h.analyzeReviewUC, h.deepWiki, h.batchDatasetUC)
 	if err != nil {
 		status := http.StatusBadRequest
 		switch err.Error() {
@@ -46,7 +56,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 			status = http.StatusNotFound
 		case "decision already exists for this review":
 			status = http.StatusConflict
-		case "unsupported mcp action", "review_id is required", "spec.repo is required (owner/name)", "query is required for ask mode":
+		case "unsupported mcp action", "review_id is required", "spec.repo is required (owner/name)", "query is required for ask mode", "dataset batch analyze is not configured":
 			status = http.StatusBadRequest
 		default:
 			if strings.Contains(err.Error(), "Error fetching wiki") || strings.Contains(err.Error(), "Repository not found") {

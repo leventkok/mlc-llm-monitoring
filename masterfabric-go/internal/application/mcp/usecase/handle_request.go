@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	datasetUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/dataset/usecase"
 	llmUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/usecase"
 	mcpModel "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/mcp/model"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/deepwiki"
@@ -25,12 +26,15 @@ func HandleMCPRequest(
 	req mcpModel.Payload,
 	analyze *llmUC.AnalyzeReviewUseCase,
 	deepWiki DeepWikiQuerier,
+	batchDataset *datasetUC.BatchAnalyzeDatasetUseCase,
 ) (mcpModel.RichResult, error) {
 	switch req.Action {
 	case "analyze_review":
 		return handleAnalyzeReview(ctx, userID, req, analyze)
 	case "deepkwiki_search":
 		return handleDeepKwikiSearch(ctx, req, deepWiki)
+	case "dataset_batch_analyze":
+		return handleDatasetBatchAnalyze(ctx, req, batchDataset)
 	default:
 		return mcpModel.RichResult{}, errors.New("unsupported mcp action")
 	}
@@ -132,6 +136,74 @@ func modeFromSpec(spec map[string]any) string {
 		return strings.TrimSpace(strings.ToLower(v))
 	}
 	return "ask"
+}
+
+func handleDatasetBatchAnalyze(
+	ctx context.Context,
+	req mcpModel.Payload,
+	batch *datasetUC.BatchAnalyzeDatasetUseCase,
+) (mcpModel.RichResult, error) {
+	if batch == nil {
+		return mcpModel.RichResult{}, errors.New("dataset batch analyze is not configured")
+	}
+	offset := req.Offset
+	limit := req.Limit
+	if req.Spec != nil {
+		if offset == 0 {
+			offset = intFromSpec(req.Spec, "offset", 0)
+		}
+		if limit == 0 {
+			limit = intFromSpec(req.Spec, "limit", 5)
+		}
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+	if limit > 5 {
+		limit = 5
+	}
+
+	result, err := batch.Execute(ctx, offset, limit)
+	if err != nil {
+		return mcpModel.RichResult{}, err
+	}
+
+	items := make([]mcpModel.BatchItem, 0, len(result.Items))
+	for _, it := range result.Items {
+		items = append(items, mcpModel.BatchItem{
+			ReviewID:          it.ReviewID,
+			Text:              it.Text,
+			ExpectedCategory:  it.ExpectedCategory,
+			ExpectedSentiment: it.ExpectedSentiment,
+			Category:          it.Category,
+			Sentiment:         it.Sentiment,
+			Match:             it.Match,
+			LatencyMs:         it.LatencyMs,
+		})
+	}
+
+	return mcpModel.RichResult{
+		Action:      "dataset_batch_analyze",
+		DatasetID:   result.DatasetID,
+		Processed:   result.Processed,
+		AccuracyPct: result.Accuracy,
+		Items:       items,
+	}, nil
+}
+
+func intFromSpec(spec map[string]any, key string, fallback int) int {
+	v, ok := spec[key]
+	if !ok {
+		return fallback
+	}
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	default:
+		return fallback
+	}
 }
 
 // Ensure deepwiki.Client satisfies DeepWikiQuerier.

@@ -1,0 +1,28 @@
+name: Sync InferReview dataset to Hugging Face
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  push-dataset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: masterfabric-go/deployments/dataset-worker
+        run: pip install pandas datasets huggingface_hub
+
+      - name: Push seed CSV to Hugging Face Hub
+        working-directory: masterfabric-go/deployments/dataset-worker
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_DATASET_ID: ${{ vars.HF_DATASET_ID || 'levonov/inferreview-app-reviews' }}
+          SEED_CSV: seed/reviews.csv
+        run: python push_to_hub.py

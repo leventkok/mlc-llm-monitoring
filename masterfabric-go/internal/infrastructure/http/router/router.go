@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	configHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/config"
+	datasetHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/dataset"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/health"
 	adminHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/admin"
 	agentHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/agent"
@@ -34,7 +35,8 @@ type Dependencies struct {
 
 	IAMHandler    *iamHandler.Handler
 	LLMHandler    *llmHandler.Handler
-	ConfigHandler *configHandler.Handler
+	ConfigHandler  *configHandler.Handler
+	DatasetHandler *datasetHandler.Handler
 	AdminHandler  *adminHandler.Handler
 	AgentHandler  *agentHandler.Handler
 	MLCAPIKey     string
@@ -102,6 +104,15 @@ func New(deps Dependencies) http.Handler {
 			r.Get("/scores", deps.LLMHandler.ListScores)
 			r.Post("/scores", deps.LLMHandler.CreateScore)
 			r.Get("/stats", deps.LLMHandler.GetMetrics)
+		})
+	}
+
+	if deps.DatasetHandler != nil {
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.LegacyAuth(deps.AppJWT))
+			r.Get("/dataset/reviews", deps.DatasetHandler.ListReviews)
+			r.Get("/dataset/reviews.csv", deps.DatasetHandler.ExportCSV)
+			r.Post("/dataset/batch-analyze", deps.DatasetHandler.BatchAnalyze)
 		})
 	}
 

@@ -87,6 +87,19 @@ services:
       mlc-engine:
         condition: service_started
 
+  dataset-worker:
+    build:
+      context: ./dataset-worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      HF_DATASET_ID: ${HF_DATASET_ID:-levonov/inferreview-app-reviews}
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_DATASETS_SERVER: ${HF_DATASETS_SERVER:-https://datasets-server.huggingface.co}
+      PORT: "8090"
+    ports:
+      - "${DATASET_WORKER_HOST_BIND:-127.0.0.1}:${DATASET_WORKER_PORT:-8090}:8090"
+
 volumes:
   mlc_models:
   mlc_jit_cache:

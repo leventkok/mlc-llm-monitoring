@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	iamUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/iam/usecase"
+	datasetUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/dataset/usecase"
 	configUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/config/usecase"
 	configModel "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/config/model"
 	llmUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/usecase"
@@ -22,6 +23,7 @@ import (
 	memConfig "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/config/memory"
 	adminHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/admin"
 	configHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/config"
+	datasetHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/dataset"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/health"
 	iamHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/iam"
 	llmHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/llm"
@@ -29,6 +31,7 @@ import (
 	mcpHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/mcp"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/router"
 	infraDeepWiki "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/deepwiki"
+	infraHFDataset "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/hfdataset"
 	infraMLC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/mlc"
 	pgConfig "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/config"
 	pgIam "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/iam"
@@ -171,6 +174,7 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 	getMetricsUC := llmUC.NewGetMetricsUseCase(reviewRepo)
 
 	var analyzeReviewUC *llmUC.AnalyzeReviewUseCase
+	var mlcClient *infraMLC.Client
 	switchRepo := pgConfig.NewSwitchRepo(db)
 	if cfg.MLC.Enabled {
 		configRepo.SetRuntimeLLM(cfg.MLC.Model, os.Getenv("MLC_LORA_ADAPTER"))
@@ -179,13 +183,26 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 			configRepo.SwitchLLM(latest.RequestModel, latest.LocalAdapter)
 			log.Info("restored active model from last switch", "profile", latest.ProfileID, "model", latest.RequestModel)
 		}
-		mlcClient := infraMLC.NewClient(cfg.MLC.BaseURL, cfg.MLC.Model, cfg.MLC.APIKey, configRepo)
+		mlcClient = infraMLC.NewClient(cfg.MLC.BaseURL, cfg.MLC.Model, cfg.MLC.APIKey, configRepo)
 		analyzeReviewUC = llmUC.NewAnalyzeReviewUseCase(reviewRepo, mlcClient)
 		log.Info("server-side mlc inference enabled", "base_url", cfg.MLC.BaseURL, "model", cfg.MLC.Model)
 	}
 
+	hfDatasetClient := infraHFDataset.NewClient(
+		os.Getenv("HF_DATASET_ID"),
+		os.Getenv("HF_TOKEN"),
+		os.Getenv("HF_DATASETS_SERVER"),
+		os.Getenv("DATASET_WORKER_URL"),
+	)
+	listDatasetUC := datasetUC.NewListDatasetReviewsUseCase(hfDatasetClient)
+	exportDatasetUC := datasetUC.NewExportDatasetCSVUseCase(hfDatasetClient)
+	var batchDatasetUC *datasetUC.BatchAnalyzeDatasetUseCase
+	if mlcClient != nil {
+		batchDatasetUC = datasetUC.NewBatchAnalyzeDatasetUseCase(hfDatasetClient, mlcClient)
+	}
+
 	deepWikiClient := infraDeepWiki.NewClient(os.Getenv("DEEPWIKI_MCP_URL"))
-	mcpHTTPHandler := mcpHandler.NewHandler(analyzeReviewUC, deepWikiClient)
+	mcpHTTPHandler := mcpHandler.NewHandler(analyzeReviewUC, deepWikiClient, batchDatasetUC)
 
 	getConfigUC := configUC.NewGetConfigUseCase(configRepo)
 	updateConfigUC := configUC.NewUpdateConfigUseCase(configRepo)
@@ -214,6 +231,7 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 			createScoreUC, listScoresUC, getMetricsUC,
 		),
 		ConfigHandler: configHandler.NewHandler(getConfigUC, updateConfigUC),
+		DatasetHandler: datasetHandler.NewHandler(listDatasetUC, exportDatasetUC, batchDatasetUC),
 		AdminHandler: adminHandler.NewHandler(
 			getLLMConfigUC, updateLLMConfigUC, listProfilesUC, switchModelUC, switchStatusUC,
 		),
