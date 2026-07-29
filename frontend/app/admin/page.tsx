@@ -7,6 +7,9 @@ import { adminApi } from "@/lib/api";
 import { AnalyzeLogEntry, LLMConfig, ModelProfile, ModelSwitchRequest } from "@/types";
 import { useRouter } from "next/navigation";
 
+const GRAFANA_URL =
+  process.env.NEXT_PUBLIC_GRAFANA_URL ?? "https://grafana.inferreview.com";
+
 const defaultLLM: LLMConfig = {
   system_prompt: "",
   temperature: 0,
@@ -130,18 +133,29 @@ export default function AdminPage() {
   return (
     <ProtectedRoute>
       <div className="mx-auto max-w-5xl px-6 py-10">
-        <header className="mb-8">
-          <p className="font-mono text-xs uppercase tracking-wider text-accent">
-            FINAL BOSS · Admin LLM Modify Panel
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-foreground">
-            LLM cockpit
-          </h1>
-          <p className="mt-2 text-sm text-muted">
-            Live prompt and inference limits apply instantly. Model adapter swap
-            queues a local engine restart via mlc-agent (MLC 0.20 merges LoRA at
-            convert time).
-          </p>
+        <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-wider text-accent">
+              FINAL BOSS · Admin LLM Modify Panel
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold text-foreground">
+              LLM cockpit
+            </h1>
+            <p className="mt-2 max-w-xl text-sm text-muted">
+              Live prompt and inference limits apply instantly. Model adapter swap
+              queues a local engine restart via mlc-agent (MLC 0.20 merges LoRA at
+              convert time).
+            </p>
+          </div>
+          <a
+            href={GRAFANA_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Requires Cloudflare Access (if configured) and Grafana admin login"
+            className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 font-mono text-xs text-accent transition hover:bg-accent/20"
+          >
+            open grafana ↗
+          </a>
         </header>
 
         {loading ? (

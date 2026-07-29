@@ -9,9 +9,6 @@ import RichResult, {
 import { reviewApi } from "@/lib/api";
 import { Decision, Metrics, Review, Score } from "@/types";
 
-const GRAFANA_URL =
-  process.env.NEXT_PUBLIC_GRAFANA_URL ?? "https://grafana.inferreview.com";
-
 export default function MonitoringPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [decisions, setDecisions] = useState<Decision[]>([]);
@@ -90,24 +87,14 @@ export default function MonitoringPage() {
               output inspection.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void load()}
-              disabled={loading}
-              className="rounded-lg border border-border px-3 py-1.5 font-mono text-xs text-foreground transition hover:bg-surface-2 disabled:opacity-50"
-            >
-              {loading ? "refreshing…" : "refresh"}
-            </button>
-            <a
-              href={GRAFANA_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 font-mono text-xs text-accent transition hover:bg-accent/20"
-            >
-              open grafana ↗
-            </a>
-          </div>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="rounded-lg border border-border px-3 py-1.5 font-mono text-xs text-foreground transition hover:bg-surface-2 disabled:opacity-50"
+          >
+            {loading ? "refreshing…" : "refresh"}
+          </button>
         </div>
 
         {error && (
