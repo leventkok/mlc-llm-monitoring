@@ -130,7 +130,7 @@ func (r *Repository) CreateInvite(ctx context.Context, orgID, role, email, creat
 	var inviteID uuid.UUID
 	err = r.db.QueryRow(ctx,
 		`INSERT INTO organization_invites (id, org_id, token, email, role, created_by, expires_at, created_at)
-		 VALUES ($1, $2, $3, NULLIF($4, ''), $5, $6, now() + ($7 || ' days')::interval, now())
+		 VALUES ($1, $2, $3, NULLIF($4, ''), $5, $6, now() + make_interval(days => $7), now())
 		 RETURNING id, expires_at, created_at`,
 		id, orgUUID, token, strings.TrimSpace(email), role, createdByUUID, days,
 	).Scan(&inviteID, &inv.ExpiresAt, &inv.CreatedAt)
