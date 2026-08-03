@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { inviteApi } from "@/lib/api";
+import { authApi, inviteApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { InvitePreview } from "@/types";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -11,6 +11,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 function emailsMatch(a: string, b: string) {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
+
+type AuthMode = "signin" | "register";
 
 export default function InvitePage() {
   const params = useParams();
@@ -23,15 +25,24 @@ export default function InvitePage() {
   const [done, setDone] = useState(false);
   const autoAcceptStarted = useRef(false);
 
+  const [authMode, setAuthMode] = useState<AuthMode>("signin");
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+
   useEffect(() => {
     if (!token) return;
     inviteApi
       .preview(token)
-      .then(setPreview)
+      .then((p) => {
+        setPreview(p);
+        if (p.email) setEmail(p.email);
+      })
       .catch(() => setError("Could not load invite"));
   }, [token]);
 
-  const handleAccept = useCallback(async () => {
+  const joinOrganization = useCallback(async () => {
     if (!token || accepting || done) return;
     setAccepting(true);
     setError("");
@@ -42,15 +53,13 @@ export default function InvitePage() {
       router.replace("/home");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not accept invite";
-      if (
-        msg.includes("already belong") ||
-        msg.includes("already used")
-      ) {
+      if (msg.includes("already belong") || msg.includes("already used")) {
         await login();
         router.replace("/home");
         return;
       }
       setError(msg);
+      autoAcceptStarted.current = false;
     } finally {
       setAccepting(false);
     }
@@ -71,7 +80,7 @@ export default function InvitePage() {
 
     if (autoAcceptStarted.current) return;
     autoAcceptStarted.current = true;
-    void handleAccept();
+    void joinOrganization();
   }, [
     authLoading,
     user,
@@ -79,11 +88,47 @@ export default function InvitePage() {
     done,
     accepting,
     emailMismatch,
-    handleAccept,
+    joinOrganization,
     router,
   ]);
 
-  const next = encodeURIComponent(`/invite/${token}`);
+  async function handleSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    setAuthBusy(true);
+    setError("");
+    autoAcceptStarted.current = true;
+    try {
+      await authApi.login({ email, password });
+      await login();
+      await joinOrganization();
+    } catch (err) {
+      autoAcceptStarted.current = false;
+      setError(err instanceof Error ? err.message : "Sign in failed");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setAuthBusy(true);
+    setError("");
+    autoAcceptStarted.current = true;
+    try {
+      await authApi.register({ email, username, password });
+      await authApi.login({ email, password });
+      await login();
+      await joinOrganization();
+    } catch (err) {
+      autoAcceptStarted.current = false;
+      setError(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  const showGuestAuth =
+    preview?.valid && !done && !user && !authLoading && !accepting && !authBusy;
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background px-4">
@@ -133,9 +178,6 @@ export default function InvitePage() {
                   <div className="sm:col-span-2">
                     <p className="text-xs text-muted">Locked to email</p>
                     <p className="font-mono text-foreground">{preview.email}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      You must sign in or register with this exact address.
-                    </p>
                   </div>
                 )}
               </div>
@@ -157,64 +199,141 @@ export default function InvitePage() {
             <p className="text-sm text-accent">Joined! Redirecting…</p>
           )}
 
-          {(accepting || (user && preview?.valid && !done && !emailMismatch && !error)) && (
+          {(accepting || authBusy) && (
             <p className="text-sm text-muted">
-              {accepting ? "Joining organization…" : "Preparing your workspace…"}
+              {authBusy ? "Signing you in…" : "Joining organization…"}
             </p>
           )}
 
-          {preview?.valid && !done && !accepting && (
-            <>
-              {authLoading ? (
-                <p className="text-sm text-muted">Checking session…</p>
-              ) : user ? (
-                emailMismatch ? (
-                  <div className="space-y-2">
-                    <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
-                      Signed in as <span className="font-mono">{user.email}</span>, but
-                      this invite is for{" "}
-                      <span className="font-mono">{lockedEmail}</span>.
-                    </p>
-                    <Link
-                      href={`/login?next=${next}`}
-                      className="block w-full rounded-lg bg-accent py-2.5 text-center font-medium text-accent-fg"
-                    >
-                      Sign in with invited email
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void logout().then(() =>
-                          router.push(`/login?next=${next}`),
-                        )
-                      }
-                      className="block w-full rounded-lg border border-border py-2.5 text-center text-sm text-foreground"
-                    >
-                      Sign out and use another account
-                    </button>
-                  </div>
-                ) : null
+          {showGuestAuth && (
+            <div className="space-y-4 border-t border-border pt-4">
+              <p className="text-sm text-muted">
+                Sign in or create an account on this page — you&apos;ll join{" "}
+                {preview?.org_name} automatically.
+              </p>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode("signin")}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm ${
+                    authMode === "signin"
+                      ? "bg-accent text-accent-fg"
+                      : "border border-border text-muted"
+                  }`}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode("register")}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm ${
+                    authMode === "register"
+                      ? "bg-accent text-accent-fg"
+                      : "border border-border text-muted"
+                  }`}
+                >
+                  Create account
+                </button>
+              </div>
+
+              {authMode === "signin" ? (
+                <form onSubmit={(e) => void handleSignIn(e)} className="space-y-3">
+                  <label className="block text-xs text-muted">
+                    Email
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      readOnly={!!lockedEmail}
+                      className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      required
+                    />
+                  </label>
+                  <label className="block text-xs text-muted">
+                    Password
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      required
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={authBusy}
+                    className="w-full rounded-lg bg-accent py-2.5 font-medium text-accent-fg disabled:opacity-50"
+                  >
+                    Sign in and join
+                  </button>
+                </form>
               ) : (
-                <div className="space-y-2">
-                  <p className="text-sm text-muted">
-                    Sign in or create an account — we&apos;ll join you to the team
-                    automatically.
-                  </p>
-                  <Link
-                    href={`/login?next=${next}`}
-                    className="block w-full rounded-lg bg-accent py-2.5 text-center font-medium text-accent-fg"
+                <form onSubmit={(e) => void handleRegister(e)} className="space-y-3">
+                  <label className="block text-xs text-muted">
+                    Email
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      readOnly={!!lockedEmail}
+                      className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      required
+                    />
+                  </label>
+                  <label className="block text-xs text-muted">
+                    Username
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      required
+                    />
+                  </label>
+                  <label className="block text-xs text-muted">
+                    Password
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      minLength={12}
+                      className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      required
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={authBusy}
+                    className="w-full rounded-lg bg-accent py-2.5 font-medium text-accent-fg disabled:opacity-50"
                   >
-                    Sign in
-                  </Link>
-                  <Link
-                    href={`/register?next=${next}`}
-                    className="block w-full rounded-lg border border-border py-2.5 text-center text-sm text-foreground"
-                  >
-                    Create account
-                  </Link>
-                </div>
+                    Create account and join
+                  </button>
+                </form>
               )}
-            </>
+            </div>
+          )}
+
+          {preview?.valid && !done && user && emailMismatch && !accepting && (
+            <div className="space-y-2">
+              <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+                Signed in as <span className="font-mono">{user.email}</span>, but
+                this invite is for{" "}
+                <span className="font-mono">{lockedEmail}</span>.
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  void logout().then(() => {
+                    setEmail(lockedEmail ?? "");
+                    setPassword("");
+                  })
+                }
+                className="block w-full rounded-lg border border-border py-2.5 text-center text-sm text-foreground"
+              >
+                Sign out and use invited email
+              </button>
+            </div>
           )}
 
           {preview && !preview.valid && user && (

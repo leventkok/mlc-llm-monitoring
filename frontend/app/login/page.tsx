@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
@@ -15,7 +15,12 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    router.replace(next);
+  }, [authLoading, user, next, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,7 +29,7 @@ function LoginForm() {
     try {
       await authApi.login({ email, password });
       await login();
-      router.push(next);
+      router.replace(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

@@ -15,7 +15,7 @@ services:
       - key: GO_ENV
         value: production
       - key: ALLOWED_ORIGINS
-        value: https://mlc-llm-monitoring.vercel.app
+        value: https://mlc-llm-monitoring.vercel.app,https://app-review-monitoring.vercel.app
       - key: MLC_LLM_ENABLED
         sync: false
       - key: MLC_LLM_BASE_URL
