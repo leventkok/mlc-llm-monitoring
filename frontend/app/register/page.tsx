@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import ThemeToggle from "@/components/ThemeToggle";
 
 function RegisterForm() {
@@ -15,6 +16,7 @@ function RegisterForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,7 +24,13 @@ function RegisterForm() {
     setLoading(true);
     try {
       await authApi.register({ email, username, password });
-      router.push(next.startsWith("/invite/") ? `/login?next=${encodeURIComponent(next)}` : "/login");
+      if (next.startsWith("/invite/")) {
+        await authApi.login({ email, password });
+        await login();
+        router.push(next);
+        return;
+      }
+      router.push("/login");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { inviteApi } from "@/lib/api";
@@ -21,6 +21,7 @@ export default function InvitePage() {
   const [error, setError] = useState("");
   const [accepting, setAccepting] = useState(false);
   const [done, setDone] = useState(false);
+  const autoAcceptStarted = useRef(false);
 
   useEffect(() => {
     if (!token) return;
@@ -30,31 +31,73 @@ export default function InvitePage() {
       .catch(() => setError("Could not load invite"));
   }, [token]);
 
-  async function handleAccept() {
+  const handleAccept = useCallback(async () => {
+    if (!token || accepting || done) return;
     setAccepting(true);
     setError("");
     try {
       await inviteApi.accept(token);
       await login();
       setDone(true);
-      setTimeout(() => router.push("/home"), 800);
+      router.replace("/home");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not accept invite");
+      const msg = err instanceof Error ? err.message : "Could not accept invite";
+      if (
+        msg.includes("already belong") ||
+        msg.includes("already used")
+      ) {
+        await login();
+        router.replace("/home");
+        return;
+      }
+      setError(msg);
     } finally {
       setAccepting(false);
     }
-  }
+  }, [token, accepting, done, login, router]);
 
-  const next = encodeURIComponent(`/invite/${token}`);
   const lockedEmail = preview?.email?.trim();
   const emailMismatch =
     !!lockedEmail && !!user && !emailsMatch(user.email, lockedEmail);
+
+  useEffect(() => {
+    if (authLoading || !user || !preview?.valid || done || accepting) return;
+    if (emailMismatch) return;
+
+    if (user.account_kind === "company" && user.organization) {
+      router.replace("/home");
+      return;
+    }
+
+    if (autoAcceptStarted.current) return;
+    autoAcceptStarted.current = true;
+    void handleAccept();
+  }, [
+    authLoading,
+    user,
+    preview,
+    done,
+    accepting,
+    emailMismatch,
+    handleAccept,
+    router,
+  ]);
+
+  const next = encodeURIComponent(`/invite/${token}`);
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background px-4">
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>
+      {user && (
+        <Link
+          href="/home"
+          className="absolute left-4 top-4 text-sm text-muted transition hover:text-foreground"
+        >
+          Go to app →
+        </Link>
+      )}
 
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
@@ -114,7 +157,13 @@ export default function InvitePage() {
             <p className="text-sm text-accent">Joined! Redirecting…</p>
           )}
 
-          {preview?.valid && !done && (
+          {(accepting || (user && preview?.valid && !done && !emailMismatch && !error)) && (
+            <p className="text-sm text-muted">
+              {accepting ? "Joining organization…" : "Preparing your workspace…"}
+            </p>
+          )}
+
+          {preview?.valid && !done && !accepting && (
             <>
               {authLoading ? (
                 <p className="text-sm text-muted">Checking session…</p>
@@ -134,26 +183,22 @@ export default function InvitePage() {
                     </Link>
                     <button
                       type="button"
-                      onClick={() => void logout().then(() => router.push(`/login?next=${next}`))}
+                      onClick={() =>
+                        void logout().then(() =>
+                          router.push(`/login?next=${next}`),
+                        )
+                      }
                       className="block w-full rounded-lg border border-border py-2.5 text-center text-sm text-foreground"
                     >
                       Sign out and use another account
                     </button>
                   </div>
-                ) : (
-                <button
-                  type="button"
-                  onClick={() => void handleAccept()}
-                  disabled={accepting}
-                  className="w-full rounded-lg bg-accent py-2.5 font-medium text-accent-fg disabled:opacity-50"
-                >
-                  {accepting ? "Joining…" : `Join ${preview.org_name}`}
-                </button>
-                )
+                ) : null
               ) : (
                 <div className="space-y-2">
                   <p className="text-sm text-muted">
-                    Sign in or create an account to accept this invite.
+                    Sign in or create an account — we&apos;ll join you to the team
+                    automatically.
                   </p>
                   <Link
                     href={`/login?next=${next}`}
@@ -170,6 +215,15 @@ export default function InvitePage() {
                 </div>
               )}
             </>
+          )}
+
+          {preview && !preview.valid && user && (
+            <Link
+              href="/home"
+              className="block w-full rounded-lg border border-border py-2.5 text-center text-sm text-foreground"
+            >
+              Go to app
+            </Link>
           )}
         </div>
       </div>
