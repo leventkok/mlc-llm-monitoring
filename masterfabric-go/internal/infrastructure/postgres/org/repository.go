@@ -132,7 +132,7 @@ func (r *Repository) CreateInvite(ctx context.Context, orgID, role, email, creat
 		`INSERT INTO organization_invites (id, org_id, token, email, role, created_by, expires_at, created_at)
 		 VALUES ($1, $2, $3, NULLIF($4, ''), $5, $6, now() + make_interval(days => $7), now())
 		 RETURNING id, expires_at, created_at`,
-		id, orgUUID, token, strings.TrimSpace(email), role, createdByUUID, days,
+		id, orgUUID, token, normalizeInviteEmail(email), role, createdByUUID, days,
 	).Scan(&inviteID, &inv.ExpiresAt, &inv.CreatedAt)
 	if err != nil {
 		return orgModel.Invite{}, err
@@ -141,7 +141,7 @@ func (r *Repository) CreateInvite(ctx context.Context, orgID, role, email, creat
 	inv.OrgID = orgID
 	inv.OrgName = orgName
 	inv.Token = token
-	inv.Email = strings.TrimSpace(email)
+	inv.Email = normalizeInviteEmail(email)
 	inv.Role = role
 	return inv, nil
 }
@@ -252,8 +252,10 @@ func (r *Repository) AcceptInvite(ctx context.Context, token, userID string) (or
 		if err := tx.QueryRow(ctx, `SELECT email FROM users WHERE id = $1`, userUUID).Scan(&userEmail); err != nil {
 			return orgModel.Member{}, err
 		}
-		if !strings.EqualFold(strings.TrimSpace(userEmail), inv.Email) {
-			return orgModel.Member{}, errors.New("invite email does not match your account")
+		locked := strings.ToLower(strings.TrimSpace(inv.Email))
+		account := strings.ToLower(strings.TrimSpace(userEmail))
+		if account != locked {
+			return orgModel.Member{}, errors.New("invite email does not match your account — sign in with " + locked + " or ask your admin for a new invite")
 		}
 	}
 
@@ -340,6 +342,10 @@ func (r *Repository) ListMembers(ctx context.Context, orgID string) ([]orgModel.
 		out = append(out, m)
 	}
 	return out, rows.Err()
+}
+
+func normalizeInviteEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
 }
 
 func isUniqueViolation(err error) bool {

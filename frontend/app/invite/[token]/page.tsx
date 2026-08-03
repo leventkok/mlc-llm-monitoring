@@ -8,11 +8,15 @@ import { useAuth } from "@/context/AuthContext";
 import { InvitePreview } from "@/types";
 import ThemeToggle from "@/components/ThemeToggle";
 
+function emailsMatch(a: string, b: string) {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 export default function InvitePage() {
   const params = useParams();
   const token = String(params.token ?? "");
   const router = useRouter();
-  const { user, login, loading: authLoading } = useAuth();
+  const { user, login, logout, loading: authLoading } = useAuth();
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [error, setError] = useState("");
   const [accepting, setAccepting] = useState(false);
@@ -42,6 +46,9 @@ export default function InvitePage() {
   }
 
   const next = encodeURIComponent(`/invite/${token}`);
+  const lockedEmail = preview?.email?.trim();
+  const emailMismatch =
+    !!lockedEmail && !!user && !emailsMatch(user.email, lockedEmail);
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background px-4">
@@ -80,9 +87,12 @@ export default function InvitePage() {
                   </p>
                 </div>
                 {preview.email && (
-                  <div>
-                    <p className="text-xs text-muted">For email</p>
+                  <div className="sm:col-span-2">
+                    <p className="text-xs text-muted">Locked to email</p>
                     <p className="font-mono text-foreground">{preview.email}</p>
+                    <p className="mt-1 text-xs text-muted">
+                      You must sign in or register with this exact address.
+                    </p>
                   </div>
                 )}
               </div>
@@ -109,6 +119,28 @@ export default function InvitePage() {
               {authLoading ? (
                 <p className="text-sm text-muted">Checking session…</p>
               ) : user ? (
+                emailMismatch ? (
+                  <div className="space-y-2">
+                    <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+                      Signed in as <span className="font-mono">{user.email}</span>, but
+                      this invite is for{" "}
+                      <span className="font-mono">{lockedEmail}</span>.
+                    </p>
+                    <Link
+                      href={`/login?next=${next}`}
+                      className="block w-full rounded-lg bg-accent py-2.5 text-center font-medium text-accent-fg"
+                    >
+                      Sign in with invited email
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void logout().then(() => router.push(`/login?next=${next}`))}
+                      className="block w-full rounded-lg border border-border py-2.5 text-center text-sm text-foreground"
+                    >
+                      Sign out and use another account
+                    </button>
+                  </div>
+                ) : (
                 <button
                   type="button"
                   onClick={() => void handleAccept()}
@@ -117,6 +149,7 @@ export default function InvitePage() {
                 >
                   {accepting ? "Joining…" : `Join ${preview.org_name}`}
                 </button>
+                )
               ) : (
                 <div className="space-y-2">
                   <p className="text-sm text-muted">
