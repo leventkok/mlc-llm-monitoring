@@ -96,15 +96,17 @@ export default function HomePage() {
             Company access is invite-only
           </h2>
           <p className="mt-3 max-w-xl text-sm text-muted">
-            When your organization wants to use InferReview, our team creates
-            your company workspace and sends a secure invite link. Open the link,
-            sign in or register, and join your team — no self-serve company
-            signup required.
+            When your organization wants to use InferReview, get in touch and we
+            will set up your company workspace and send secure invite links to
+            your team — no public company signup.
           </p>
-          <p className="mt-4 font-mono text-xs text-muted">
-            Have an invite? Open the link you received (e.g.{" "}
-            <span className="text-foreground">/invite/…</span>).
-          </p>
+          <button
+            type="button"
+            className="mt-6 rounded-xl border border-accent/40 bg-background px-5 py-2.5 font-medium text-accent transition hover:bg-surface-2"
+            aria-label="Contact us — coming soon"
+          >
+            Contact us
+          </button>
         </section>
       </main>
     </div>
