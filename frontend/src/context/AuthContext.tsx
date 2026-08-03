@@ -8,7 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { User } from "@/types";
-import { authApi } from "@/lib/api";
+import { authApi, setAuthToken } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
@@ -28,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u = await authApi.me();
       setUser(u);
     } catch {
+      setAuthToken(null);
       setUser(null);
     }
   }

@@ -76,7 +76,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	infraAuth.SetSessionCookie(w, token)
-	response.LegacyJSON(w, http.StatusOK, dto.MessageResponse{Message: "signed in"})
+	response.LegacyJSON(w, http.StatusOK, dto.AuthTokenResponse{Message: "signed in", Token: token})
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +165,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	infraAuth.SetSessionCookie(w, token)
-	response.LegacyJSON(w, http.StatusOK, dto.MessageResponse{Message: "token refreshed"})
+	response.LegacyJSON(w, http.StatusOK, dto.AuthTokenResponse{Message: "token refreshed", Token: token})
 }
 
 func (h *Handler) Validate(w http.ResponseWriter, r *http.Request) {

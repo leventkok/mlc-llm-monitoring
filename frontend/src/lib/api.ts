@@ -25,16 +25,36 @@ export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   (process.env.VERCEL === "1" ? PRODUCTION_API_URL : "http://localhost:8080");
 
+const AUTH_TOKEN_KEY = "inferreview_auth_token";
+
+export function getAuthToken(): string | null {
+  if (typeof sessionStorage === "undefined") return null;
+  return sessionStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string | null) {
+  if (typeof sessionStorage === "undefined") return;
+  if (token) sessionStorage.setItem(AUTH_TOKEN_KEY, token);
+  else sessionStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+function authHeaders(extra: HeadersInit = {}): HeadersInit {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(extra as Record<string, string>),
+  };
+  const token = getAuthToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       ...options,
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
+      headers: authHeaders(options.headers),
     });
   } catch {
     throw new Error(
@@ -64,15 +84,24 @@ export const authApi = {
       body: JSON.stringify(creds),
     }),
 
-  login: (creds: LoginCredentials) =>
-    request<{ message: string }>("/auth/login", {
+  login: async (creds: LoginCredentials) => {
+    const res = await request<{ message: string; token?: string }>("/auth/login", {
       method: "POST",
       body: JSON.stringify(creds),
-    }),
+    });
+    if (res.token) setAuthToken(res.token);
+    return res;
+  },
 
   me: () => request<User>("/auth/me"),
 
-  logout: () => request<{ message: string }>("/auth/logout"),
+  logout: async () => {
+    try {
+      return await request<{ message: string }>("/auth/logout");
+    } finally {
+      setAuthToken(null);
+    }
+  },
 
   changePassword: (oldPassword: string, newPassword: string) =>
     request<{ message: string }>("/auth/change-password", {
@@ -156,7 +185,10 @@ export const adminApi = {
 async function requestText(path: string): Promise<string> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, { credentials: "include" });
+    const headers: Record<string, string> = {};
+    const token = getAuthToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    res = await fetch(`${API_URL}${path}`, { credentials: "include", headers });
   } catch {
     throw new Error(
       "Could not reach the API. Check NEXT_PUBLIC_API_URL and that the backend is running.",

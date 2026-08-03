@@ -36,6 +36,12 @@ type MessageResponse struct {
 	Message string `json:"message"`
 }
 
+// AuthTokenResponse is returned after sign-in or token refresh.
+type AuthTokenResponse struct {
+	Message string `json:"message"`
+	Token   string `json:"token"`
+}
+
 // ValidateResponse confirms token validity.
 type ValidateResponse struct {
 	Valid  bool   `json:"valid"`
