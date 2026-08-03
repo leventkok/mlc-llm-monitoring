@@ -15,10 +15,20 @@ type LoginRequest struct {
 
 // UserResponse is the public user JSON shape expected by the frontend.
 type UserResponse struct {
-	ID       string `json:"id"`
-	Email    string `json:"email"`
-	Username string `json:"username"`
-	IsAdmin  bool   `json:"is_admin"`
+	ID           string               `json:"id"`
+	Email        string               `json:"email"`
+	Username     string               `json:"username"`
+	IsAdmin      bool                 `json:"is_admin"`
+	PlatformRole string               `json:"platform_role"`
+	AccountKind  string               `json:"account_kind"`
+	Organization *OrganizationSummary `json:"organization,omitempty"`
+}
+
+type OrganizationSummary struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+	Role string `json:"role"`
 }
 
 // MessageResponse is a simple status message.

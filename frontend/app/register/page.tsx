@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
 import ThemeToggle from "@/components/ThemeToggle";
 
-export default function RegisterPage() {
+function RegisterForm() {
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") || "/login";
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -20,7 +22,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await authApi.register({ email, username, password });
-      router.push("/login");
+      router.push(next.startsWith("/invite/") ? `/login?next=${encodeURIComponent(next)}` : "/login");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -29,26 +31,23 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
+    <>
+      <div className="mb-8 text-center">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent">
+          app · review · monitoring
+        </p>
+        <h1 className="mt-3 text-2xl font-medium text-foreground">
+          Create account
+        </h1>
+        <p className="mt-1 text-sm text-muted">
+          Individual signup — company teams join via invite link
+        </p>
       </div>
 
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent">
-            app · review · monitoring
-          </p>
-          <h1 className="mt-3 text-2xl font-medium text-foreground">
-            Create account
-          </h1>
-          <p className="mt-1 text-sm text-muted">Start monitoring in seconds</p>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 rounded-2xl border border-border bg-surface p-6"
-        >
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4 rounded-2xl border border-border bg-surface p-6"
+      >
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
               Email
@@ -107,10 +106,27 @@ export default function RegisterPage() {
 
         <p className="mt-4 text-center text-sm text-muted">
           Already have an account?{" "}
-          <Link href="/login" className="text-accent hover:underline">
+          <Link
+            href={next !== "/login" ? `/login?next=${encodeURIComponent(next)}` : "/login"}
+            className="text-accent hover:underline"
+          >
             Sign in
           </Link>
         </p>
+    </>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <div className="relative flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+      <div className="w-full max-w-sm">
+        <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>
+          <RegisterForm />
+        </Suspense>
       </div>
     </div>
   );

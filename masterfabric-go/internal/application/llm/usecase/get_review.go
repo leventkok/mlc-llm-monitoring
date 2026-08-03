@@ -17,8 +17,8 @@ func NewGetReviewUseCase(reviews repository.ReviewRepository) *GetReviewUseCase 
 	return &GetReviewUseCase{reviews: reviews}
 }
 
-func (uc *GetReviewUseCase) Execute(ctx context.Context, userID, reviewID string) (model.Review, error) {
-	review, err := uc.reviews.GetReviewForUser(ctx, reviewID, userID)
+func (uc *GetReviewUseCase) Execute(ctx context.Context, scope model.ReviewScope, reviewID string) (model.Review, error) {
+	review, err := uc.reviews.GetReviewForScope(ctx, reviewID, scope)
 	if err != nil {
 		if errors.Is(err, pgLlm.ErrNotFound) {
 			return model.Review{}, errors.New("review not found")

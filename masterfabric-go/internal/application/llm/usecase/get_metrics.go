@@ -16,8 +16,8 @@ func NewGetMetricsUseCase(reviews repository.ReviewRepository) *GetMetricsUseCas
 	return &GetMetricsUseCase{reviews: reviews}
 }
 
-func (uc *GetMetricsUseCase) Execute(ctx context.Context, userID string) (model.Metrics, error) {
-	metrics, err := uc.reviews.GetMetrics(ctx, userID)
+func (uc *GetMetricsUseCase) Execute(ctx context.Context, scope model.ReviewScope) (model.Metrics, error) {
+	metrics, err := uc.reviews.GetMetrics(ctx, scope)
 	if err != nil {
 		return model.Metrics{}, errors.New("could not compute metrics")
 	}

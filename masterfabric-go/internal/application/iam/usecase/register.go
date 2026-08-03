@@ -11,7 +11,6 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/iam/repository"
 	infraAuth "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/auth"
 	pgIam "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/iam"
-	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/admin"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/validate"
 )
 
@@ -47,6 +46,8 @@ func (uc *RegisterUseCase) Execute(ctx context.Context, req dto.RegisterRequest)
 		Email:        req.Email,
 		Username:     req.Username,
 		PasswordHash: string(hash),
+		AccountKind:  model.AccountKindIndividual,
+		PlatformRole: model.PlatformRoleUser,
 	}
 
 	if err := uc.users.Create(ctx, user); err != nil {
@@ -56,10 +57,5 @@ func (uc *RegisterUseCase) Execute(ctx context.Context, req dto.RegisterRequest)
 		return dto.UserResponse{}, errors.New("registration failed")
 	}
 
-	return dto.UserResponse{
-		ID:       user.ID.String(),
-		Email:    user.Email,
-		Username: user.Username,
-		IsAdmin:  admin.IsAdmin(user.Username),
-	}, nil
+	return toUserResponse(user, nil, ctx), nil
 }

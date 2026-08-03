@@ -16,13 +16,10 @@ func NewListReviewsUseCase(reviews repository.ReviewRepository) *ListReviewsUseC
 	return &ListReviewsUseCase{reviews: reviews}
 }
 
-func (uc *ListReviewsUseCase) Execute(ctx context.Context, userID string, limit, offset int) ([]model.Review, error) {
-	reviews, err := uc.reviews.ListReviews(ctx, userID, limit, offset)
+func (uc *ListReviewsUseCase) Execute(ctx context.Context, scope model.ReviewScope, limit, offset int) ([]model.Review, error) {
+	reviews, err := uc.reviews.ListReviews(ctx, scope, limit, offset)
 	if err != nil {
 		return nil, errors.New("could not list reviews")
-	}
-	if reviews == nil {
-		reviews = []model.Review{}
 	}
 	return reviews, nil
 }

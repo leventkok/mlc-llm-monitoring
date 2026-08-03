@@ -20,7 +20,7 @@ func NewCreateScoreUseCase(reviews repository.ReviewRepository) *CreateScoreUseC
 	return &CreateScoreUseCase{reviews: reviews}
 }
 
-func (uc *CreateScoreUseCase) Execute(ctx context.Context, userID string, req dto.CreateScoreRequest) (model.Score, error) {
+func (uc *CreateScoreUseCase) Execute(ctx context.Context, scope model.ReviewScope, req dto.CreateScoreRequest) (model.Score, error) {
 	if req.Quality < 1 || req.Quality > 5 {
 		return model.Score{}, errors.New("quality must be between 1 and 5")
 	}
@@ -35,9 +35,9 @@ func (uc *CreateScoreUseCase) Execute(ctx context.Context, userID string, req dt
 		DecisionID:      req.DecisionID,
 		Quality:         req.Quality,
 		CorrectCategory: req.CorrectCategory,
-		ScoredBy:        userID,
+		ScoredBy:        scope.UserID,
 	}
-	if err := uc.reviews.CreateScore(ctx, score, userID); err != nil {
+	if err := uc.reviews.CreateScore(ctx, score, scope); err != nil {
 		if errors.Is(err, pgLlm.ErrAlreadyScored) {
 			return model.Score{}, errors.New("decision already scored")
 		}

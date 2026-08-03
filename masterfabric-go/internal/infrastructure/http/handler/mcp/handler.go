@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	datasetUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/dataset/usecase"
+	llmScope "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/scope"
 	mcpUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/mcp/usecase"
 	llmUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/usecase"
 	mcpModel "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/mcp/model"
@@ -14,17 +15,20 @@ import (
 )
 
 type Handler struct {
+	scope           *llmScope.Resolver
 	analyzeReviewUC *llmUC.AnalyzeReviewUseCase
 	deepWiki        mcpUC.DeepWikiQuerier
 	batchDatasetUC  *datasetUC.BatchAnalyzeDatasetUseCase
 }
 
 func NewHandler(
+	scope *llmScope.Resolver,
 	analyzeReviewUC *llmUC.AnalyzeReviewUseCase,
 	deepWiki mcpUC.DeepWikiQuerier,
 	batchDatasetUC *datasetUC.BatchAnalyzeDatasetUseCase,
 ) *Handler {
 	return &Handler{
+		scope:           scope,
 		analyzeReviewUC: analyzeReviewUC,
 		deepWiki:        deepWiki,
 		batchDatasetUC:  batchDatasetUC,
@@ -44,7 +48,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := mcpUC.HandleMCPRequest(r.Context(), userID, req, h.analyzeReviewUC, h.deepWiki, h.batchDatasetUC)
+	result, err := mcpUC.HandleMCPRequest(r.Context(), h.scope.ForUser(r.Context(), userID), req, h.analyzeReviewUC, h.deepWiki, h.batchDatasetUC)
 	if err != nil {
 		status := http.StatusBadRequest
 		switch err.Error() {

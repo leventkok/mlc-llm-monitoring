@@ -19,6 +19,7 @@ import (
 	configUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/config/usecase"
 	configModel "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/config/model"
 	llmUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/usecase"
+	llmScope "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/scope"
 	infraAuth "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/auth"
 	memConfig "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/config/memory"
 	adminHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/admin"
@@ -33,6 +34,11 @@ import (
 	infraDeepWiki "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/deepwiki"
 	infraHFDataset "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/hfdataset"
 	infraMLC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/mlc"
+	orgUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/org/usecase"
+	inviteHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/invite"
+	orgHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/org"
+	orgadminHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/orgadmin"
+	pgOrg "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/org"
 	pgConfig "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/config"
 	pgIam "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/iam"
 	pgLlm "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/llm"
@@ -73,6 +79,9 @@ func run() error {
 
 	if err := database.MigrateAppSchema(ctx, db); err != nil {
 		return fmt.Errorf("migration failed: %w", err)
+	}
+	if err := database.BackfillRoles(ctx, db); err != nil {
+		return fmt.Errorf("role backfill failed: %w", err)
 	}
 	log.Info("database schema ready")
 
@@ -153,13 +162,16 @@ func validateJWTSecret(secret string) {
 
 func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, appJWT *infraAuth.AppJWTService, metricsHandler http.Handler, metricsEnabled bool) router.Dependencies {
 	userRepo := pgIam.NewAppUserRepo(db)
+	orgRepo := pgOrg.NewRepository(db)
+	orgService := orgUC.NewService(orgRepo).WithUsers(userRepo)
+	reviewScope := llmScope.NewResolver(orgService)
 	reviewRepo := pgLlm.NewReviewRepo(db)
 	configRepo := memConfig.NewConfigRepo()
 
 	registerUC := iamUC.NewRegisterUseCase(userRepo)
 	loginUC := iamUC.NewLoginUseCase(userRepo, appJWT)
-	getMeUC := iamUC.NewGetMeUseCase(userRepo)
-	updateMeUC := iamUC.NewUpdateMeUseCase(userRepo)
+	getMeUC := iamUC.NewGetMeUseCase(userRepo, orgService)
+	updateMeUC := iamUC.NewUpdateMeUseCase(userRepo, orgService)
 	deleteMeUC := iamUC.NewDeleteMeUseCase(userRepo)
 	refreshUC := iamUC.NewRefreshUseCase(appJWT)
 	changePasswordUC := iamUC.NewChangePasswordUseCase(userRepo)
@@ -202,7 +214,7 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 	}
 
 	deepWikiClient := infraDeepWiki.NewClient(os.Getenv("DEEPWIKI_MCP_URL"))
-	mcpHTTPHandler := mcpHandler.NewHandler(analyzeReviewUC, deepWikiClient, batchDatasetUC)
+	mcpHTTPHandler := mcpHandler.NewHandler(reviewScope, analyzeReviewUC, deepWikiClient, batchDatasetUC)
 
 	getConfigUC := configUC.NewGetConfigUseCase(configRepo)
 	updateConfigUC := configUC.NewUpdateConfigUseCase(configRepo)
@@ -226,6 +238,7 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 			registerUC, loginUC, getMeUC, updateMeUC, deleteMeUC, refreshUC, changePasswordUC,
 		),
 		LLMHandler: llmHandler.NewHandler(
+			reviewScope,
 			createReviewUC, getReviewUC, listReviewsUC, analyzeReviewUC,
 			createDecisionUC, listDecisionsUC,
 			createScoreUC, listScoresUC, getMetricsUC,
@@ -235,6 +248,9 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 		AdminHandler: adminHandler.NewHandler(
 			getLLMConfigUC, updateLLMConfigUC, listProfilesUC, switchModelUC, switchStatusUC,
 		),
+		OrgAdminHandler: orgadminHandler.NewHandler(orgService),
+		OrgHandler:      orgHandler.NewHandler(orgService),
+		InviteHandler:   inviteHandler.NewHandler(orgService),
 		AgentHandler:  agentHandler.NewHandler(agentSwitchUC),
 		MLCAPIKey:     cfg.MLC.APIKey,
 		MCPHandler:    mcpHTTPHandler,

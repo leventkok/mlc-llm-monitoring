@@ -34,11 +34,17 @@ func (r *AppUserRepo) Create(ctx context.Context, user *model.User) error {
 	if user.CreatedAt.IsZero() {
 		user.CreatedAt = time.Now().UTC()
 	}
+	if user.AccountKind == "" {
+		user.AccountKind = model.AccountKindIndividual
+	}
+	if user.PlatformRole == "" {
+		user.PlatformRole = model.PlatformRoleUser
+	}
 
 	_, err := r.db.Exec(ctx,
-		`INSERT INTO users (id, email, username, password_hash, created_at)
-		 VALUES ($1, $2, $3, $4, $5)`,
-		user.ID, user.Email, user.Username, user.PasswordHash, user.CreatedAt,
+		`INSERT INTO users (id, email, username, password_hash, account_kind, platform_role, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		user.ID, user.Email, user.Username, user.PasswordHash, user.AccountKind, user.PlatformRole, user.CreatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -53,20 +59,33 @@ func (r *AppUserRepo) Create(ctx context.Context, user *model.User) error {
 }
 
 func (r *AppUserRepo) GetByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
-	return r.scanOne(ctx, `SELECT id, email, username, password_hash, created_at FROM users WHERE id = $1`, id)
+	return r.scanOne(ctx, `SELECT id, email, username, password_hash, account_kind, platform_role, created_at FROM users WHERE id = $1`, id)
 }
 
 func (r *AppUserRepo) GetByEmail(ctx context.Context, email string) (*model.User, error) {
-	return r.scanOne(ctx, `SELECT id, email, username, password_hash, created_at FROM users WHERE email = $1`, email)
+	return r.scanOne(ctx, `SELECT id, email, username, password_hash, account_kind, platform_role, created_at FROM users WHERE email = $1`, email)
 }
 
 func (r *AppUserRepo) GetByUsername(ctx context.Context, username string) (*model.User, error) {
-	return r.scanOne(ctx, `SELECT id, email, username, password_hash, created_at FROM users WHERE username = $1`, username)
+	return r.scanOne(ctx, `SELECT id, email, username, password_hash, account_kind, platform_role, created_at FROM users WHERE username = $1`, username)
+}
+
+func (r *AppUserRepo) SetAccountKind(ctx context.Context, id uuid.UUID, kind string) error {
+	tag, err := r.db.Exec(ctx, `UPDATE users SET account_kind = $1 WHERE id = $2`, kind, id)
+	if err != nil {
+		return domainErr.New(domainErr.ErrInternal, "failed to update account kind", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domainErr.New(domainErr.ErrNotFound, "user not found", nil)
+	}
+	return nil
 }
 
 func (r *AppUserRepo) scanOne(ctx context.Context, query string, arg any) (*model.User, error) {
 	var u model.User
-	err := r.db.QueryRow(ctx, query, arg).Scan(&u.ID, &u.Email, &u.Username, &u.PasswordHash, &u.CreatedAt)
+	err := r.db.QueryRow(ctx, query, arg).Scan(
+		&u.ID, &u.Email, &u.Username, &u.PasswordHash, &u.AccountKind, &u.PlatformRole, &u.CreatedAt,
+	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domainErr.New(domainErr.ErrNotFound, "user not found", nil)
@@ -78,8 +97,8 @@ func (r *AppUserRepo) scanOne(ctx context.Context, query string, arg any) (*mode
 
 func (r *AppUserRepo) Update(ctx context.Context, user *model.User) error {
 	tag, err := r.db.Exec(ctx,
-		`UPDATE users SET email = $1, username = $2, password_hash = $3 WHERE id = $4`,
-		user.Email, user.Username, user.PasswordHash, user.ID,
+		`UPDATE users SET email = $1, username = $2, password_hash = $3, account_kind = $4, platform_role = $5 WHERE id = $6`,
+		user.Email, user.Username, user.PasswordHash, user.AccountKind, user.PlatformRole, user.ID,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {

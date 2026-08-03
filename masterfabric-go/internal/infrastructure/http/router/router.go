@@ -15,6 +15,9 @@ import (
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/health"
 	adminHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/admin"
 	agentHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/agent"
+	inviteHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/invite"
+	orgHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/org"
+	orgadminHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/orgadmin"
 	iamHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/iam"
 	llmHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/llm"
 	mcpHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/mcp"
@@ -38,6 +41,9 @@ type Dependencies struct {
 	ConfigHandler  *configHandler.Handler
 	DatasetHandler *datasetHandler.Handler
 	AdminHandler  *adminHandler.Handler
+	OrgAdminHandler *orgadminHandler.Handler
+	OrgHandler      *orgHandler.Handler
+	InviteHandler *inviteHandler.Handler
 	AgentHandler  *agentHandler.Handler
 	MLCAPIKey     string
 	MCPHandler    *mcpHandler.Handler
@@ -116,6 +122,23 @@ func New(deps Dependencies) http.Handler {
 		})
 	}
 
+	if deps.InviteHandler != nil {
+		r.Get("/invites/{token}", deps.InviteHandler.Preview)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.LegacyAuth(deps.AppJWT))
+			r.Post("/invites/{token}/accept", deps.InviteHandler.Accept)
+		})
+	}
+
+	if deps.OrgHandler != nil {
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.LegacyAuth(deps.AppJWT))
+			r.Get("/organization/members", deps.OrgHandler.ListMembers)
+			r.Get("/organization/invites", deps.OrgHandler.ListInvites)
+			r.Post("/organization/invites", deps.OrgHandler.CreateInvite)
+		})
+	}
+
 	if deps.MCPHandler != nil {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.LegacyAuth(deps.AppJWT))
@@ -133,6 +156,17 @@ func New(deps Dependencies) http.Handler {
 			r.Get("/admin/model-profiles", deps.AdminHandler.ListModelProfiles)
 			r.Post("/admin/switch-model", deps.AdminHandler.SwitchModel)
 			r.Get("/admin/model-switch/status", deps.AdminHandler.ModelSwitchStatus)
+		})
+	}
+
+	if deps.OrgAdminHandler != nil && deps.UserRepo != nil {
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.LegacyAuth(deps.AppJWT))
+			r.Use(middleware.LegacyRequireAdmin(deps.UserRepo))
+			r.Get("/admin/organizations", deps.OrgAdminHandler.ListOrganizations)
+			r.Post("/admin/organizations", deps.OrgAdminHandler.CreateOrganization)
+			r.Get("/admin/organizations/{orgId}/invites", deps.OrgAdminHandler.ListInvites)
+			r.Post("/admin/organizations/{orgId}/invites", deps.OrgAdminHandler.CreateInvite)
 		})
 	}
 

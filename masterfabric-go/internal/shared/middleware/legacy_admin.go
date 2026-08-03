@@ -34,7 +34,7 @@ func LegacyRequireAdmin(users repository.UserRepository) func(http.Handler) http
 				return
 			}
 
-			if !admin.IsAdmin(user.Username) {
+			if !admin.IsPlatformAdmin(user) {
 				response.LegacyError(w, http.StatusForbidden, "admin access required")
 				return
 			}

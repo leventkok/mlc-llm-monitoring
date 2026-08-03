@@ -12,6 +12,11 @@ import {
   ModelSwitchRequest,
   DatasetReviewPage,
   BatchAnalyzeResult,
+  Organization,
+  OrgInvite,
+  OrgMember,
+  InvitePreview,
+  OrganizationMembership,
 } from "../types";
 
 const PRODUCTION_API_URL = "https://mlc-llm-monitoring.onrender.com";
@@ -184,4 +189,48 @@ export const datasetApi = {
       `/dataset/batch-analyze?offset=${offset}&limit=${limit}`,
       { method: "POST" },
     ),
+};
+
+export const inviteApi = {
+  preview: (token: string) => request<InvitePreview>(`/invites/${token}`),
+
+  accept: (token: string) =>
+    request<{ message: string; organization: OrganizationMembership }>(
+      `/invites/${token}/accept`,
+      { method: "POST" },
+    ),
+};
+
+export const orgAdminApi = {
+  listOrganizations: () => request<Organization[]>("/admin/organizations"),
+
+  createOrganization: (name: string) =>
+    request<Organization>("/admin/organizations", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  listInvites: (orgId: string) =>
+    request<OrgInvite[]>(`/admin/organizations/${orgId}/invites`),
+
+  createInvite: (
+    orgId: string,
+    data: { role: string; email?: string; days?: number },
+  ) =>
+    request<OrgInvite>(`/admin/organizations/${orgId}/invites`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
+export const orgApi = {
+  listMembers: () => request<OrgMember[]>("/organization/members"),
+
+  listInvites: () => request<OrgInvite[]>("/organization/invites"),
+
+  createInvite: (data: { role: string; email?: string; days?: number }) =>
+    request<OrgInvite>("/organization/invites", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };

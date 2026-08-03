@@ -3,6 +3,52 @@ export interface User {
   email: string;
   username: string;
   is_admin?: boolean;
+  platform_role?: "user" | "platform_admin";
+  account_kind?: "individual" | "company";
+  organization?: OrganizationMembership;
+}
+
+export interface OrgMember {
+  user_id: string;
+  email: string;
+  username: string;
+  role: string;
+  joined_at: string;
+}
+
+export interface OrganizationMembership {
+  id: string;
+  name: string;
+  slug: string;
+  role: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+}
+
+export interface OrgInvite {
+  id: string;
+  org_id: string;
+  org_name: string;
+  token: string;
+  role: string;
+  email?: string;
+  expires_at: string;
+  used_at?: string;
+  invite_path: string;
+}
+
+export interface InvitePreview {
+  org_name: string;
+  role: string;
+  email?: string;
+  expires_at: string;
+  valid: boolean;
+  reason?: string;
 }
 
 export interface RegisterCredentials {

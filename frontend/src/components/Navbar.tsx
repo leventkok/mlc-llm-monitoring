@@ -9,12 +9,12 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
 
-  if (!user || pathname === "/login" || pathname === "/register") {
+  if (!user || pathname === "/" || pathname === "/login" || pathname === "/register" || pathname.startsWith("/invite/")) {
     return null;
   }
 
   const links = [
-    { href: "/", label: "Home" },
+    { href: "/home", label: "Home" },
     { href: "/dashboard", label: "Dashboard" },
     { href: "/dataset", label: "Dataset" },
     { href: "/deepkwiki", label: "DeepKwiki" },
@@ -54,6 +54,11 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
+          {user.organization && (
+            <span className="hidden font-mono text-[10px] text-muted sm:inline">
+              {user.organization.name}
+            </span>
+          )}
           <span className="font-mono text-xs text-muted">{user.username}</span>
           <ThemeToggle />
           <button

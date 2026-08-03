@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	llmScope "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/scope"
 	llmUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/usecase"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/dto"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/middleware"
@@ -13,6 +14,7 @@ import (
 )
 
 type Handler struct {
+	scope            *llmScope.Resolver
 	createReviewUC   *llmUC.CreateReviewUseCase
 	getReviewUC      *llmUC.GetReviewUseCase
 	listReviewsUC    *llmUC.ListReviewsUseCase
@@ -25,6 +27,7 @@ type Handler struct {
 }
 
 func NewHandler(
+	scope *llmScope.Resolver,
 	createReviewUC *llmUC.CreateReviewUseCase,
 	getReviewUC *llmUC.GetReviewUseCase,
 	listReviewsUC *llmUC.ListReviewsUseCase,
@@ -36,6 +39,7 @@ func NewHandler(
 	getMetricsUC *llmUC.GetMetricsUseCase,
 ) *Handler {
 	return &Handler{
+		scope:            scope,
 		createReviewUC:   createReviewUC,
 		getReviewUC:      getReviewUC,
 		listReviewsUC:    listReviewsUC,
@@ -61,7 +65,8 @@ func (h *Handler) CreateReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	review, err := h.createReviewUC.Execute(r.Context(), userID, req)
+	scope := h.scope.ForUser(r.Context(), userID)
+	review, err := h.createReviewUC.Execute(r.Context(), scope, req)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() != "could not save review" {
@@ -86,7 +91,8 @@ func (h *Handler) GetReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	review, err := h.getReviewUC.Execute(r.Context(), userID, id)
+	scope := h.scope.ForUser(r.Context(), userID)
+	review, err := h.getReviewUC.Execute(r.Context(), scope, id)
 	if err != nil {
 		response.LegacyError(w, http.StatusNotFound, err.Error())
 		return
@@ -102,7 +108,8 @@ func (h *Handler) ListReviews(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit, offset := listParams(r)
-	reviews, err := h.listReviewsUC.Execute(r.Context(), userID, limit, offset)
+	scope := h.scope.ForUser(r.Context(), userID)
+	reviews, err := h.listReviewsUC.Execute(r.Context(), scope, limit, offset)
 	if err != nil {
 		response.LegacyError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -128,7 +135,8 @@ func (h *Handler) AnalyzeReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decision, err := h.analyzeReviewUC.Execute(r.Context(), userID, id)
+	scope := h.scope.ForUser(r.Context(), userID)
+	decision, err := h.analyzeReviewUC.Execute(r.Context(), scope, id)
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch err.Error() {
@@ -160,7 +168,8 @@ func (h *Handler) SaveDecision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decision, err := h.createDecisionUC.Execute(r.Context(), userID, req)
+	scope := h.scope.ForUser(r.Context(), userID)
+	decision, err := h.createDecisionUC.Execute(r.Context(), scope, req)
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch err.Error() {
@@ -185,7 +194,8 @@ func (h *Handler) ListDecisions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit, offset := listParams(r)
-	decisions, err := h.listDecisionsUC.Execute(r.Context(), userID, limit, offset)
+	scope := h.scope.ForUser(r.Context(), userID)
+	decisions, err := h.listDecisionsUC.Execute(r.Context(), scope, limit, offset)
 	if err != nil {
 		response.LegacyError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -206,7 +216,8 @@ func (h *Handler) CreateScore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	score, err := h.createScoreUC.Execute(r.Context(), userID, req)
+	scope := h.scope.ForUser(r.Context(), userID)
+	score, err := h.createScoreUC.Execute(r.Context(), scope, req)
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch err.Error() {
@@ -231,7 +242,8 @@ func (h *Handler) ListScores(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit, offset := listParams(r)
-	scores, err := h.listScoresUC.Execute(r.Context(), userID, limit, offset)
+	scope := h.scope.ForUser(r.Context(), userID)
+	scores, err := h.listScoresUC.Execute(r.Context(), scope, limit, offset)
 	if err != nil {
 		response.LegacyError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -246,7 +258,8 @@ func (h *Handler) GetMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metrics, err := h.getMetricsUC.Execute(r.Context(), userID)
+	scope := h.scope.ForUser(r.Context(), userID)
+	metrics, err := h.getMetricsUC.Execute(r.Context(), scope)
 	if err != nil {
 		response.LegacyError(w, http.StatusInternalServerError, err.Error())
 		return

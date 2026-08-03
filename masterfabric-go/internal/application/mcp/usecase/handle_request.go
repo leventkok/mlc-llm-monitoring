@@ -8,6 +8,7 @@ import (
 
 	datasetUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/dataset/usecase"
 	llmUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/llm/usecase"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/llm/model"
 	mcpModel "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/mcp/model"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/deepwiki"
 )
@@ -22,7 +23,7 @@ type DeepWikiQuerier interface {
 // HandleMCPRequest validates MCP payloads and routes to the appropriate handler.
 func HandleMCPRequest(
 	ctx context.Context,
-	userID string,
+	scope model.ReviewScope,
 	req mcpModel.Payload,
 	analyze *llmUC.AnalyzeReviewUseCase,
 	deepWiki DeepWikiQuerier,
@@ -30,7 +31,7 @@ func HandleMCPRequest(
 ) (mcpModel.RichResult, error) {
 	switch req.Action {
 	case "analyze_review":
-		return handleAnalyzeReview(ctx, userID, req, analyze)
+		return handleAnalyzeReview(ctx, scope, req, analyze)
 	case "deepkwiki_search":
 		return handleDeepKwikiSearch(ctx, req, deepWiki)
 	case "dataset_batch_analyze":
@@ -42,7 +43,7 @@ func HandleMCPRequest(
 
 func handleAnalyzeReview(
 	ctx context.Context,
-	userID string,
+	scope model.ReviewScope,
 	req mcpModel.Payload,
 	analyze *llmUC.AnalyzeReviewUseCase,
 ) (mcpModel.RichResult, error) {
@@ -53,7 +54,7 @@ func handleAnalyzeReview(
 		return mcpModel.RichResult{}, errors.New("review_id is required")
 	}
 
-	decision, err := analyze.Execute(ctx, userID, req.ReviewID)
+	decision, err := analyze.Execute(ctx, scope, req.ReviewID)
 	if err != nil {
 		return mcpModel.RichResult{}, err
 	}

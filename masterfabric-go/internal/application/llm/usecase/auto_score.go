@@ -80,13 +80,13 @@ func clampQuality(v int) int {
 	return v
 }
 
-func persistAutoScore(ctx context.Context, reviews repository.ReviewRepository, userID string, decision model.Decision) error {
+func persistAutoScore(ctx context.Context, reviews repository.ReviewRepository, scope model.ReviewScope, decision model.Decision) error {
 	quality := ComputeAutoQuality(decision.Category, decision.Sentiment, decision.RawOutput, decision.LatencyMs)
 	metrics.RecordAutoScore(quality)
 	return reviews.CreateScore(ctx, model.Score{
 		ID:         uuid.NewString(),
 		DecisionID: decision.ID,
 		Quality:    quality,
-		ScoredBy:   userID,
-	}, userID)
+		ScoredBy:   scope.UserID,
+	}, scope)
 }

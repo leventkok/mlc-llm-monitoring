@@ -27,12 +27,12 @@ func NewAnalyzeReviewUseCase(reviews repository.ReviewRepository, classifier Rev
 	return &AnalyzeReviewUseCase{reviews: reviews, classifier: classifier}
 }
 
-func (uc *AnalyzeReviewUseCase) Execute(ctx context.Context, userID, reviewID string) (model.Decision, error) {
+func (uc *AnalyzeReviewUseCase) Execute(ctx context.Context, scope model.ReviewScope, reviewID string) (model.Decision, error) {
 	if uc.classifier == nil {
 		return model.Decision{}, errors.New("mlc inference is not configured")
 	}
 
-	review, err := uc.reviews.GetReviewForUser(ctx, reviewID, userID)
+	review, err := uc.reviews.GetReviewForScope(ctx, reviewID, scope)
 	if err != nil {
 		if errors.Is(err, pgLlm.ErrNotFound) {
 			return model.Decision{}, errors.New("review not found")
@@ -44,7 +44,7 @@ func (uc *AnalyzeReviewUseCase) Execute(ctx context.Context, userID, reviewID st
 	if err != nil {
 		metrics.RecordAnalyzeError()
 		analyzelog.Record(analyzelog.Entry{
-			UserID:   userID,
+			UserID:   scope.UserID,
 			ReviewID: reviewID,
 			Status:   "error",
 			Error:    err.Error(),
@@ -53,7 +53,7 @@ func (uc *AnalyzeReviewUseCase) Execute(ctx context.Context, userID, reviewID st
 	}
 
 	createUC := NewCreateDecisionUseCase(uc.reviews)
-	decision, err := createUC.Execute(ctx, userID, dto.SaveDecisionRequest{
+	decision, err := createUC.Execute(ctx, scope, dto.SaveDecisionRequest{
 		ReviewID:  reviewID,
 		Category:  classification.Category,
 		Sentiment: classification.Sentiment,
@@ -66,7 +66,7 @@ func (uc *AnalyzeReviewUseCase) Execute(ctx context.Context, userID, reviewID st
 
 	metrics.RecordAnalyzeSuccess(classification.LatencyMs)
 	analyzelog.Record(analyzelog.Entry{
-		UserID:    userID,
+		UserID:    scope.UserID,
 		ReviewID:  reviewID,
 		Category:  decision.Category,
 		Sentiment: decision.Sentiment,

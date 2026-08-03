@@ -16,8 +16,8 @@ func NewListScoresUseCase(reviews repository.ReviewRepository) *ListScoresUseCas
 	return &ListScoresUseCase{reviews: reviews}
 }
 
-func (uc *ListScoresUseCase) Execute(ctx context.Context, userID string, limit, offset int) ([]model.Score, error) {
-	scores, err := uc.reviews.ListScores(ctx, userID, limit, offset)
+func (uc *ListScoresUseCase) Execute(ctx context.Context, scope model.ReviewScope, limit, offset int) ([]model.Score, error) {
+	scores, err := uc.reviews.ListScores(ctx, scope, limit, offset)
 	if err != nil {
 		return nil, errors.New("could not list scores")
 	}

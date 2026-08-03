@@ -6,17 +6,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/iam/dto"
+	orgUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/org/usecase"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/iam/repository"
 	domainErr "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/errors"
-	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/admin"
 )
 
 type GetMeUseCase struct {
 	users repository.UserRepository
+	org   *orgUC.Service
 }
 
-func NewGetMeUseCase(users repository.UserRepository) *GetMeUseCase {
-	return &GetMeUseCase{users: users}
+func NewGetMeUseCase(users repository.UserRepository, org *orgUC.Service) *GetMeUseCase {
+	return &GetMeUseCase{users: users, org: org}
 }
 
 func (uc *GetMeUseCase) Execute(ctx context.Context, userID string) (dto.UserResponse, error) {
@@ -37,10 +38,5 @@ func (uc *GetMeUseCase) Execute(ctx context.Context, userID string) (dto.UserRes
 		return dto.UserResponse{}, errors.New("user not found")
 	}
 
-	return dto.UserResponse{
-		ID:       user.ID.String(),
-		Email:    user.Email,
-		Username: user.Username,
-		IsAdmin:  admin.IsAdmin(user.Username),
-	}, nil
+	return toUserResponse(user, uc.org, ctx), nil
 }

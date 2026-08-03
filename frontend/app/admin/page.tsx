@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useAuth } from "@/context/AuthContext";
-import { adminApi } from "@/lib/api";
-import { AnalyzeLogEntry, LLMConfig, ModelProfile, ModelSwitchRequest } from "@/types";
+import { adminApi, orgAdminApi } from "@/lib/api";
+import { AnalyzeLogEntry, LLMConfig, ModelProfile, ModelSwitchRequest, Organization, OrgInvite } from "@/types";
 import { useRouter } from "next/navigation";
 
 const GRAFANA_URL =
@@ -32,6 +32,13 @@ export default function AdminPage() {
   const [selectedProfile, setSelectedProfile] = useState("");
   const [switchStatus, setSwitchStatus] = useState<ModelSwitchRequest | null>(null);
   const [switching, setSwitching] = useState(false);
+  const [orgs, setOrgs] = useState<Organization[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState("");
+  const [invites, setInvites] = useState<OrgInvite[]>([]);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("company_admin");
+  const [orgBusy, setOrgBusy] = useState(false);
 
   const loadSwitchStatus = useCallback(async () => {
     try {
@@ -63,16 +70,21 @@ export default function AdminPage() {
     setLoading(true);
     setError("");
     try {
-      const [cfg, entries, profs, sw] = await Promise.all([
+      const [cfg, entries, profs, sw, orgList] = await Promise.all([
         adminApi.getLLMConfig(),
         adminApi.analyzeLogs(50),
         adminApi.modelProfiles(),
         adminApi.modelSwitchStatus(),
+        orgAdminApi.listOrganizations(),
       ]);
       setLLM(cfg);
       setLogs(entries);
       setProfiles(profs);
       setSwitchStatus(sw);
+      setOrgs(orgList);
+      if (!selectedOrgId && orgList.length > 0) {
+        setSelectedOrgId(orgList[0].id);
+      }
       if (!selectedProfile && profs.length > 0) {
         const active = profs.find((p) => p.request_model === cfg.active_model);
         setSelectedProfile(active?.id ?? profs[0].id);
@@ -98,6 +110,58 @@ export default function AdminPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  useEffect(() => {
+    if (!user?.is_admin || !selectedOrgId) return;
+    orgAdminApi
+      .listInvites(selectedOrgId)
+      .then(setInvites)
+      .catch(() => setInvites([]));
+  }, [user, selectedOrgId]);
+
+  async function handleCreateOrg(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newOrgName.trim()) return;
+    setOrgBusy(true);
+    setError("");
+    try {
+      const org = await orgAdminApi.createOrganization(newOrgName.trim());
+      setOrgs((prev) => [org, ...prev]);
+      setSelectedOrgId(org.id);
+      setNewOrgName("");
+      setMessage(`Organization "${org.name}" created — generate an invite below.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create organization");
+    } finally {
+      setOrgBusy(false);
+    }
+  }
+
+  async function handleCreateInvite(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedOrgId) return;
+    setOrgBusy(true);
+    setError("");
+    try {
+      const inv = await orgAdminApi.createInvite(selectedOrgId, {
+        role: inviteRole,
+        email: inviteEmail.trim(),
+        days: 14,
+      });
+      setInvites((prev) => [inv, ...prev]);
+      setInviteEmail("");
+      setMessage("Invite link created — copy and send to the company contact.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create invite");
+    } finally {
+      setOrgBusy(false);
+    }
+  }
+
+  function inviteURL(path: string) {
+    if (typeof window === "undefined") return path;
+    return `${window.location.origin}${path}`;
   }
 
   async function handleSwitchModel() {
@@ -320,6 +384,109 @@ export default function AdminPage() {
                 {saving ? "Saving…" : "Save LLM settings"}
               </button>
             </form>
+
+            <section className="rounded-xl border border-border bg-surface-1 p-5 lg:col-span-2">
+              <h2 className="font-mono text-sm font-medium text-foreground">
+                Company invites
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                Create an organization for each company, then send a secure invite
+                link. They register or sign in and join — no public company signup.
+              </p>
+
+              <form
+                onSubmit={(e) => void handleCreateOrg(e)}
+                className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
+              >
+                <label className="block flex-1 text-xs text-muted">
+                  New organization
+                  <input
+                    value={newOrgName}
+                    onChange={(e) => setNewOrgName(e.target.value)}
+                    placeholder="Acme Mobile Studio"
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={orgBusy || !newOrgName.trim()}
+                  className="rounded-lg border border-accent px-4 py-2 text-sm text-accent disabled:opacity-50"
+                >
+                  Create org
+                </button>
+              </form>
+
+              {orgs.length > 0 && (
+                <div className="mt-6 space-y-4 border-t border-border pt-5">
+                  <label className="block text-xs text-muted">
+                    Select organization
+                    <select
+                      value={selectedOrgId}
+                      onChange={(e) => setSelectedOrgId(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm"
+                    >
+                      {orgs.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <form
+                    onSubmit={(e) => void handleCreateInvite(e)}
+                    className="grid gap-3 sm:grid-cols-3 sm:items-end"
+                  >
+                    <label className="block text-xs text-muted sm:col-span-1">
+                      Role
+                      <select
+                        value={inviteRole}
+                        onChange={(e) => setInviteRole(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="company_admin">company admin</option>
+                        <option value="company_member">company member</option>
+                      </select>
+                    </label>
+                    <label className="block text-xs text-muted sm:col-span-1">
+                      Email (optional lock)
+                      <input
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        placeholder="contact@company.com"
+                        className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={orgBusy || !selectedOrgId}
+                      className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg disabled:opacity-50"
+                    >
+                      Generate invite link
+                    </button>
+                  </form>
+
+                  {invites.length > 0 && (
+                    <ul className="space-y-2">
+                      {invites.map((inv) => (
+                        <li
+                          key={inv.id}
+                          className="rounded-lg border border-border bg-background px-3 py-2 font-mono text-[11px]"
+                        >
+                          <p className="text-muted">
+                            {inv.role} · expires {new Date(inv.expires_at).toLocaleDateString()}
+                            {inv.used_at ? " · used" : ""}
+                          </p>
+                          <p className="mt-1 break-all text-accent">
+                            {inviteURL(inv.invite_path)}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </section>
 
             <section className="rounded-xl border border-border bg-surface-1 p-5 lg:col-span-2">
               <div className="mb-4 flex items-center justify-between">

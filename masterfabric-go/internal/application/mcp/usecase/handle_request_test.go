@@ -5,11 +5,16 @@ import (
 	"testing"
 
 	mcpUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/mcp/usecase"
+	llmModel "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/llm/model"
 	mcpModel "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/mcp/model"
 )
 
+func userScope(userID string) llmModel.ReviewScope {
+	return llmModel.ReviewScope{UserID: userID}
+}
+
 func TestHandleMCPRequest_UnsupportedAction(t *testing.T) {
-	_, err := mcpUC.HandleMCPRequest(context.Background(), "user-1", mcpModel.Payload{
+	_, err := mcpUC.HandleMCPRequest(context.Background(), userScope("user-1"), mcpModel.Payload{
 		Action: "unknown",
 	}, nil, nil, nil)
 	if err == nil || err.Error() != "unsupported mcp action" {
@@ -18,7 +23,7 @@ func TestHandleMCPRequest_UnsupportedAction(t *testing.T) {
 }
 
 func TestHandleMCPRequest_NilAnalyze(t *testing.T) {
-	_, err := mcpUC.HandleMCPRequest(context.Background(), "user-1", mcpModel.Payload{
+	_, err := mcpUC.HandleMCPRequest(context.Background(), userScope("user-1"), mcpModel.Payload{
 		Action:   "analyze_review",
 		ReviewID: "rev-1",
 	}, nil, nil, nil)
@@ -28,7 +33,7 @@ func TestHandleMCPRequest_NilAnalyze(t *testing.T) {
 }
 
 func TestHandleDeepKwiki_RequiresRepo(t *testing.T) {
-	_, err := mcpUC.HandleMCPRequest(context.Background(), "user-1", mcpModel.Payload{
+	_, err := mcpUC.HandleMCPRequest(context.Background(), userScope("user-1"), mcpModel.Payload{
 		Action: "deepkwiki_search",
 		Query:  "what is this repo?",
 	}, nil, nil, nil)
@@ -54,7 +59,7 @@ func (s stubDeepWiki) ReadWikiContents(_ context.Context, _ string) (string, err
 }
 
 func TestHandleDeepKwiki_Ask(t *testing.T) {
-	result, err := mcpUC.HandleMCPRequest(context.Background(), "user-1", mcpModel.Payload{
+	result, err := mcpUC.HandleMCPRequest(context.Background(), userScope("user-1"), mcpModel.Payload{
 		Action: "deepkwiki_search",
 		Query:  "What is MLC?",
 		Spec:   map[string]any{"repo": "mlc-ai/mlc-llm", "mode": "ask"},

@@ -3,9 +3,23 @@ package admin
 import (
 	"os"
 	"strings"
+
+	iamModel "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/iam/model"
 )
 
 const defaultAdminUsernames = "admin"
+
+// IsPlatformAdmin reports whether the user has platform admin privileges.
+// DB platform_role is authoritative; ADMIN_USERNAMES env remains a fallback for migration.
+func IsPlatformAdmin(user *iamModel.User) bool {
+	if user != nil && user.PlatformRole == iamModel.PlatformRoleAdmin {
+		return true
+	}
+	if user != nil && IsAdmin(user.Username) {
+		return true
+	}
+	return false
+}
 
 // IsAdmin reports whether username is listed in ADMIN_USERNAMES (comma-separated).
 func IsAdmin(username string) bool {

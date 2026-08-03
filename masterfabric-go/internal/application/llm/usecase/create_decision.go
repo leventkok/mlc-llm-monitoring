@@ -21,7 +21,7 @@ func NewCreateDecisionUseCase(reviews repository.ReviewRepository) *CreateDecisi
 	return &CreateDecisionUseCase{reviews: reviews}
 }
 
-func (uc *CreateDecisionUseCase) Execute(ctx context.Context, userID string, req dto.SaveDecisionRequest) (model.Decision, error) {
+func (uc *CreateDecisionUseCase) Execute(ctx context.Context, scope model.ReviewScope, req dto.SaveDecisionRequest) (model.Decision, error) {
 	if req.ReviewID == "" || req.Category == "" || req.Sentiment == "" {
 		return model.Decision{}, errors.New("review_id, category and sentiment are required")
 	}
@@ -43,7 +43,7 @@ func (uc *CreateDecisionUseCase) Execute(ctx context.Context, userID string, req
 		RawOutput: req.RawOutput,
 		LatencyMs: req.LatencyMs,
 	}
-	if err := uc.reviews.CreateDecision(ctx, decision, userID); err != nil {
+	if err := uc.reviews.CreateDecision(ctx, decision, scope); err != nil {
 		if errors.Is(err, pgLlm.ErrNotFound) {
 			return model.Decision{}, errors.New("review not found")
 		}
@@ -53,7 +53,7 @@ func (uc *CreateDecisionUseCase) Execute(ctx context.Context, userID string, req
 		return model.Decision{}, errors.New("could not save decision")
 	}
 
-	if err := persistAutoScore(ctx, uc.reviews, userID, decision); err != nil {
+	if err := persistAutoScore(ctx, uc.reviews, scope, decision); err != nil {
 		return model.Decision{}, errors.New("could not save auto score")
 	}
 

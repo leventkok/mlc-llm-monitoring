@@ -70,6 +70,39 @@ var legacyMigrations = []string{
 	    completed_at   TIMESTAMPTZ
 	)`,
 	`CREATE INDEX IF NOT EXISTS model_switch_requests_status_idx ON model_switch_requests (status, created_at DESC)`,
+	`CREATE TABLE IF NOT EXISTS organizations (
+	    id         UUID PRIMARY KEY,
+	    name       TEXT NOT NULL,
+	    slug       TEXT NOT NULL UNIQUE,
+	    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	)`,
+	`CREATE TABLE IF NOT EXISTS organization_members (
+	    org_id    UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+	    user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	    role      TEXT NOT NULL,
+	    joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	    PRIMARY KEY (org_id, user_id),
+	    UNIQUE (user_id)
+	)`,
+	`CREATE INDEX IF NOT EXISTS organization_members_org_id_idx ON organization_members (org_id)`,
+	`CREATE TABLE IF NOT EXISTS organization_invites (
+	    id          UUID PRIMARY KEY,
+	    org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+	    token       TEXT NOT NULL UNIQUE,
+	    email       TEXT,
+	    role        TEXT NOT NULL,
+	    created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+	    expires_at  TIMESTAMPTZ NOT NULL,
+	    used_at     TIMESTAMPTZ,
+	    used_by     UUID REFERENCES users(id) ON DELETE SET NULL,
+	    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+	)`,
+	`CREATE INDEX IF NOT EXISTS organization_invites_org_id_idx ON organization_invites (org_id, created_at DESC)`,
+	`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_kind TEXT NOT NULL DEFAULT 'individual'`,
+	`ALTER TABLE users ADD COLUMN IF NOT EXISTS platform_role TEXT NOT NULL DEFAULT 'user'`,
+	`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
+	`CREATE INDEX IF NOT EXISTS reviews_org_id_idx ON reviews (org_id)`,
+	`CREATE INDEX IF NOT EXISTS reviews_user_org_idx ON reviews (user_id, org_id)`,
 }
 
 // MigrateAppSchema applies the app review monitoring schema on startup.
