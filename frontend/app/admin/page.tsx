@@ -34,7 +34,7 @@ export default function AdminPage() {
   const [switching, setSwitching] = useState(false);
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState("");
-  const [invites, setInvites] = useState<OrgInvite[]>([]);
+  const [latestInvite, setLatestInvite] = useState<OrgInvite | null>(null);
   const [newOrgName, setNewOrgName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("company_admin");
@@ -114,10 +114,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!user?.is_admin || !selectedOrgId) return;
-    orgAdminApi
-      .listInvites(selectedOrgId)
-      .then(setInvites)
-      .catch(() => setInvites([]));
+    setLatestInvite(null);
   }, [user, selectedOrgId]);
 
   async function handleCreateOrg(e: React.FormEvent) {
@@ -129,10 +126,36 @@ export default function AdminPage() {
       const org = await orgAdminApi.createOrganization(newOrgName.trim());
       setOrgs((prev) => [org, ...prev]);
       setSelectedOrgId(org.id);
+      setLatestInvite(null);
       setNewOrgName("");
       setMessage(`Organization "${org.name}" created — generate an invite below.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create organization");
+    } finally {
+      setOrgBusy(false);
+    }
+  }
+
+  async function handleDeleteOrg() {
+    if (!selectedOrgId) return;
+    const org = orgs.find((o) => o.id === selectedOrgId);
+    const orgName = org?.name ?? "this organization";
+    const confirmed = window.confirm(
+      `Delete "${orgName}" permanently? All member accounts will be closed, organization reviews removed, and every invite link for this company will stop working.`,
+    );
+    if (!confirmed) return;
+    setOrgBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await orgAdminApi.deleteOrganization(selectedOrgId);
+      const remaining = orgs.filter((o) => o.id !== selectedOrgId);
+      setOrgs(remaining);
+      setSelectedOrgId(remaining[0]?.id ?? "");
+      setLatestInvite(null);
+      setMessage(`"${orgName}" deleted — all linked accounts and invite links are closed.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete organization");
     } finally {
       setOrgBusy(false);
     }
@@ -149,7 +172,7 @@ export default function AdminPage() {
         email: inviteEmail.trim(),
         days: 14,
       });
-      setInvites((prev) => [inv, ...prev]);
+      setLatestInvite(inv);
       setInviteEmail("");
       setMessage("Invite link created — copy and send to the company contact.");
     } catch (err) {
@@ -433,6 +456,17 @@ export default function AdminPage() {
                     </select>
                   </label>
 
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteOrg()}
+                      disabled={orgBusy || !selectedOrgId}
+                      className="rounded-lg border border-red-500/50 px-4 py-2 text-sm font-medium text-red-500 transition hover:bg-red-500/10 disabled:opacity-50"
+                    >
+                      Delete organization
+                    </button>
+                  </div>
+
                   <form
                     onSubmit={(e) => void handleCreateInvite(e)}
                     className="grid gap-3 sm:grid-cols-3 sm:items-end"
@@ -466,23 +500,16 @@ export default function AdminPage() {
                     </button>
                   </form>
 
-                  {invites.length > 0 && (
-                    <ul className="space-y-2">
-                      {invites.map((inv) => (
-                        <li
-                          key={inv.id}
-                          className="rounded-lg border border-border bg-background px-3 py-2 font-mono text-[11px]"
-                        >
-                          <p className="text-muted">
-                            {inv.role} · expires {new Date(inv.expires_at).toLocaleDateString()}
-                            {inv.used_at ? " · used" : ""}
-                          </p>
-                          <p className="mt-1 break-all text-accent">
-                            {inviteURL(inv.invite_path)}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
+                  {latestInvite && (
+                    <div className="rounded-lg border border-border bg-background px-3 py-2 font-mono text-[11px]">
+                      <p className="text-muted">
+                        {latestInvite.role} · expires{" "}
+                        {new Date(latestInvite.expires_at).toLocaleDateString()}
+                      </p>
+                      <p className="mt-1 break-all text-accent">
+                        {inviteURL(latestInvite.invite_path)}
+                      </p>
+                    </div>
                   )}
                 </div>
               )}

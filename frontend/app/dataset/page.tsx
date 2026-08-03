@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useAuth } from "@/context/AuthContext";
 import { datasetApi } from "@/lib/api";
 import {
   BatchAnalyzeItem,
@@ -96,6 +98,8 @@ function AnalyzeResultRow({ item }: { item: BatchAnalyzeItem }) {
 }
 
 export default function DatasetPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [page, setPage] = useState<DatasetReviewPage | null>(null);
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState<number>(20);
@@ -124,8 +128,16 @@ export default function DatasetPage() {
   }, [offset, limit]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
+    if (!user.is_admin) {
+      router.replace("/home");
+    }
+  }, [authLoading, user, router]);
+
+  useEffect(() => {
+    if (authLoading || !user?.is_admin) return;
     void load();
-  }, [load]);
+  }, [load, authLoading, user]);
 
   async function handleExportCSV() {
     setCsvLoading(true);

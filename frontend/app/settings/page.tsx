@@ -19,12 +19,13 @@ export default function SettingsPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [members, setMembers] = useState<OrgMember[]>([]);
-  const [invites, setInvites] = useState<OrgInvite[]>([]);
+  const [latestInvite, setLatestInvite] = useState<OrgInvite | null>(null);
   const [inviteRole, setInviteRole] = useState("company_member");
   const [inviteEmail, setInviteEmail] = useState("");
   const [orgMsg, setOrgMsg] = useState("");
   const [orgError, setOrgError] = useState("");
   const [orgBusy, setOrgBusy] = useState(false);
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
 
   const isCompany = user?.account_kind === "company" && user.organization;
   const isCompanyAdmin = isCompany && user?.organization?.role === "company_admin";
@@ -36,14 +37,6 @@ export default function SettingsPage() {
       .then(setMembers)
       .catch(() => setMembers([]));
   }, [isCompany]);
-
-  useEffect(() => {
-    if (!isCompanyAdmin) return;
-    orgApi
-      .listInvites()
-      .then(setInvites)
-      .catch(() => setInvites([]));
-  }, [isCompanyAdmin]);
 
   function inviteURL(path: string) {
     if (typeof window === "undefined") return path;
@@ -62,13 +55,34 @@ export default function SettingsPage() {
         email: inviteEmail.trim(),
         days: 14,
       });
-      setInvites((prev) => [inv, ...prev]);
+      setLatestInvite(inv);
       setInviteEmail("");
       setOrgMsg("Invite link created — share it with your teammate.");
     } catch (err) {
       setOrgError(err instanceof Error ? err.message : "Could not create invite");
     } finally {
       setOrgBusy(false);
+    }
+  }
+
+  async function handleRemoveMember(member: OrgMember) {
+    if (!isCompanyAdmin || !user) return;
+    if (member.user_id === user.id) return;
+    const confirmed = window.confirm(
+      `Remove ${member.username} from the team and permanently delete their account? They will lose sign-in access immediately. Organization reviews they created will stay with your team.`,
+    );
+    if (!confirmed) return;
+    setRemovingUserId(member.user_id);
+    setOrgError("");
+    setOrgMsg("");
+    try {
+      await orgApi.removeMember(member.user_id);
+      setMembers((prev) => prev.filter((m) => m.user_id !== member.user_id));
+      setOrgMsg(`${member.username} removed — their account was deleted.`);
+    } catch (err) {
+      setOrgError(err instanceof Error ? err.message : "Could not remove member");
+    } finally {
+      setRemovingUserId(null);
     }
   }
 
@@ -184,12 +198,24 @@ export default function SettingsPage() {
                   {members.map((m) => (
                     <li
                       key={m.user_id}
-                      className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2"
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2"
                     >
-                      <span className="text-foreground">{m.username}</span>
-                      <span className="font-mono text-[11px] text-muted">
-                        {m.role.replace("_", " ")}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="text-foreground">{m.username}</span>
+                        <span className="ml-2 font-mono text-[11px] text-muted">
+                          {m.role.replace("_", " ")}
+                        </span>
+                      </div>
+                      {isCompanyAdmin && m.user_id !== user?.id && (
+                        <button
+                          type="button"
+                          onClick={() => void handleRemoveMember(m)}
+                          disabled={removingUserId === m.user_id}
+                          className="shrink-0 rounded-md border border-red-500/40 px-2 py-1 text-[11px] font-medium text-red-500 transition hover:bg-red-500/10 disabled:opacity-50"
+                        >
+                          {removingUserId === m.user_id ? "Removing…" : "Remove"}
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -233,24 +259,16 @@ export default function SettingsPage() {
                   </button>
                 </form>
 
-                {invites.length > 0 && (
-                  <ul className="mt-4 space-y-2">
-                    {invites.map((inv) => (
-                      <li
-                        key={inv.id}
-                        className="rounded-lg border border-border bg-background px-3 py-2 font-mono text-[11px]"
-                      >
-                        <p className="text-muted">
-                          {inv.role} · expires{" "}
-                          {new Date(inv.expires_at).toLocaleDateString()}
-                          {inv.used_at ? " · used" : ""}
-                        </p>
-                        <p className="mt-1 break-all text-accent">
-                          {inviteURL(inv.invite_path)}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
+                {latestInvite && (
+                  <div className="mt-4 rounded-lg border border-border bg-background px-3 py-2 font-mono text-[11px]">
+                    <p className="text-muted">
+                      {latestInvite.role} · expires{" "}
+                      {new Date(latestInvite.expires_at).toLocaleDateString()}
+                    </p>
+                    <p className="mt-1 break-all text-accent">
+                      {inviteURL(latestInvite.invite_path)}
+                    </p>
+                  </div>
                 )}
               </div>
             )}

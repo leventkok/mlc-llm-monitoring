@@ -116,6 +116,7 @@ func New(deps Dependencies) http.Handler {
 	if deps.DatasetHandler != nil {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.LegacyAuth(deps.AppJWT))
+			r.Use(middleware.LegacyRequireAdmin(deps.UserRepo))
 			r.Get("/dataset/reviews", deps.DatasetHandler.ListReviews)
 			r.Get("/dataset/reviews.csv", deps.DatasetHandler.ExportCSV)
 			r.Post("/dataset/batch-analyze", deps.DatasetHandler.BatchAnalyze)
@@ -134,6 +135,7 @@ func New(deps Dependencies) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.LegacyAuth(deps.AppJWT))
 			r.Get("/organization/members", deps.OrgHandler.ListMembers)
+			r.Delete("/organization/members/{userId}", deps.OrgHandler.RemoveMember)
 			r.Get("/organization/invites", deps.OrgHandler.ListInvites)
 			r.Post("/organization/invites", deps.OrgHandler.CreateInvite)
 		})
@@ -165,6 +167,7 @@ func New(deps Dependencies) http.Handler {
 			r.Use(middleware.LegacyRequireAdmin(deps.UserRepo))
 			r.Get("/admin/organizations", deps.OrgAdminHandler.ListOrganizations)
 			r.Post("/admin/organizations", deps.OrgAdminHandler.CreateOrganization)
+			r.Delete("/admin/organizations/{orgId}", deps.OrgAdminHandler.DeleteOrganization)
 			r.Get("/admin/organizations/{orgId}/invites", deps.OrgAdminHandler.ListInvites)
 			r.Post("/admin/organizations/{orgId}/invites", deps.OrgAdminHandler.CreateInvite)
 		})

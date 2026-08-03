@@ -43,6 +43,19 @@ func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) {
 	response.LegacyJSON(w, http.StatusCreated, org)
 }
 
+func (h *Handler) DeleteOrganization(w http.ResponseWriter, r *http.Request) {
+	orgID := chi.URLParam(r, "orgId")
+	if err := h.org.DeleteOrganization(r.Context(), orgID); err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "organization not found" {
+			status = http.StatusNotFound
+		}
+		response.LegacyError(w, status, err.Error())
+		return
+	}
+	response.LegacyJSON(w, http.StatusOK, orgDTO.MessageResponse{Message: "organization deleted"})
+}
+
 func (h *Handler) ListInvites(w http.ResponseWriter, r *http.Request) {
 	orgID := chi.URLParam(r, "orgId")
 	list, err := h.org.ListInvites(r.Context(), orgID)

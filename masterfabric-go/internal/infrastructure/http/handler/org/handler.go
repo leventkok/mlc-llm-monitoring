@@ -8,6 +8,8 @@ import (
 	orgUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/org/usecase"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/middleware"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/response"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type Handler struct {
@@ -66,4 +68,29 @@ func (h *Handler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.LegacyJSON(w, http.StatusCreated, inv)
+}
+
+func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.LegacyUserID(r.Context())
+	if !ok {
+		response.LegacyError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	targetUserID := chi.URLParam(r, "userId")
+	if targetUserID == "" {
+		response.LegacyError(w, http.StatusBadRequest, "user id required")
+		return
+	}
+	if err := h.org.RemoveMemberForAdmin(r.Context(), userID, targetUserID); err != nil {
+		status := http.StatusBadRequest
+		switch err.Error() {
+		case "organization membership required", "company admin role required":
+			status = http.StatusForbidden
+		case "member not found":
+			status = http.StatusNotFound
+		}
+		response.LegacyError(w, status, err.Error())
+		return
+	}
+	response.LegacyJSON(w, http.StatusOK, orgDTO.MessageResponse{Message: "member removed and account deleted"})
 }

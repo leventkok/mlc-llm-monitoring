@@ -57,3 +57,7 @@ type MemberResponse struct {
 	Role     string `json:"role"`
 	JoinedAt string `json:"joined_at"`
 }
+
+type MessageResponse struct {
+	Message string `json:"message"`
+}

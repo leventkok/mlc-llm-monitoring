@@ -14,12 +14,16 @@ export default function AppHomePage() {
       desc: "Add reviews, analyze via MLC, and inspect rich classification results",
       tag: "analyze",
     },
-    {
-      href: "/dataset",
-      title: "Dataset",
-      desc: "Browse Hugging Face review corpus, export CSV, and batch-evaluate MLC accuracy",
-      tag: "hf hub",
-    },
+    ...(user?.is_admin
+      ? [
+          {
+            href: "/dataset",
+            title: "Dataset",
+            desc: "Browse Hugging Face review corpus, export CSV, and batch-evaluate MLC accuracy",
+            tag: "hf hub",
+          },
+        ]
+      : []),
     {
       href: "/monitoring",
       title: "Monitoring",

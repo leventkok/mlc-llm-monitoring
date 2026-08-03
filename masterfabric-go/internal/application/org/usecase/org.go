@@ -83,6 +83,46 @@ func (s *Service) ListInvites(ctx context.Context, orgID string) ([]orgDTO.Invit
 	return out, nil
 }
 
+func (s *Service) DeleteOrganization(ctx context.Context, orgID string) error {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" {
+		return errors.New("organization id is required")
+	}
+
+	memberIDs, err := s.repo.ListMemberUserIDs(ctx, orgID)
+	if err != nil {
+		if errors.Is(err, pgOrg.ErrNotFound) {
+			return errors.New("organization not found")
+		}
+		return errors.New("could not list organization members")
+	}
+
+	if err := s.repo.DeleteOrgReviews(ctx, orgID); err != nil {
+		return errors.New("could not delete organization data")
+	}
+
+	if s.users == nil {
+		return errors.New("could not delete organization accounts")
+	}
+	for _, memberID := range memberIDs {
+		uid, parseErr := uuid.Parse(memberID)
+		if parseErr != nil {
+			continue
+		}
+		if err := s.users.Delete(ctx, uid); err != nil {
+			return errors.New("could not delete organization accounts")
+		}
+	}
+
+	if err := s.repo.DeleteOrganization(ctx, orgID); err != nil {
+		if errors.Is(err, pgOrg.ErrNotFound) {
+			return errors.New("organization not found")
+		}
+		return errors.New("could not delete organization")
+	}
+	return nil
+}
+
 func (s *Service) PreviewInvite(ctx context.Context, token string) (orgDTO.InvitePreviewResponse, error) {
 	inv, err := s.repo.GetInviteByToken(ctx, token)
 	if err != nil {
@@ -181,6 +221,50 @@ func (s *Service) ListInvitesForMember(ctx context.Context, userID string) ([]or
 		return nil, errors.New("company admin role required")
 	}
 	return s.ListInvites(ctx, m.OrgID)
+}
+
+func (s *Service) RemoveMemberForAdmin(ctx context.Context, actorUserID, targetUserID string) error {
+	if actorUserID == targetUserID {
+		return errors.New("you cannot remove yourself from the team")
+	}
+	actor, err := s.repo.GetMemberByUserID(ctx, actorUserID)
+	if err != nil || actor == nil {
+		return errors.New("organization membership required")
+	}
+	if actor.Role != orgModel.MemberRoleAdmin {
+		return errors.New("company admin role required")
+	}
+	target, err := s.repo.GetMemberByUserID(ctx, targetUserID)
+	if err != nil || target == nil {
+		return errors.New("member not found")
+	}
+	if target.OrgID != actor.OrgID {
+		return errors.New("member not found")
+	}
+	if err := s.repo.ValidateMemberRemoval(ctx, actor.OrgID, targetUserID); err != nil {
+		switch {
+		case errors.Is(err, pgOrg.ErrNotFound):
+			return errors.New("member not found")
+		case errors.Is(err, pgOrg.ErrLastAdmin):
+			return errors.New("cannot remove the last company admin")
+		default:
+			return errors.New("could not remove member")
+		}
+	}
+	if err := s.repo.TransferReviewOwnership(ctx, actor.OrgID, targetUserID, actorUserID); err != nil {
+		return errors.New("could not transfer organization data")
+	}
+	if s.users == nil {
+		return errors.New("could not delete account")
+	}
+	targetUUID, err := uuid.Parse(targetUserID)
+	if err != nil {
+		return errors.New("member not found")
+	}
+	if err := s.users.Delete(ctx, targetUUID); err != nil {
+		return errors.New("could not delete account")
+	}
+	return nil
 }
 
 func (s *Service) MembershipForUser(ctx context.Context, userID string) *orgDTO.OrganizationSummary {

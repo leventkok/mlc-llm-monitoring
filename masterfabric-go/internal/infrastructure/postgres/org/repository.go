@@ -20,6 +20,7 @@ var (
 	ErrNotFound      = errors.New("not found")
 	ErrAlreadyMember = errors.New("user already belongs to an organization")
 	ErrInviteInvalid = errors.New("invite invalid or expired")
+	ErrLastAdmin     = errors.New("cannot remove the last company admin")
 )
 
 type Repository struct {
@@ -342,6 +343,112 @@ func (r *Repository) ListMembers(ctx context.Context, orgID string) ([]orgModel.
 		out = append(out, m)
 	}
 	return out, rows.Err()
+}
+
+func (r *Repository) TransferReviewOwnership(ctx context.Context, orgID, fromUserID, toUserID string) error {
+	orgUUID, err := uuid.Parse(orgID)
+	if err != nil {
+		return ErrNotFound
+	}
+	fromUUID, err := uuid.Parse(fromUserID)
+	if err != nil {
+		return ErrNotFound
+	}
+	toUUID, err := uuid.Parse(toUserID)
+	if err != nil {
+		return ErrNotFound
+	}
+	_, err = r.db.Exec(ctx,
+		`UPDATE reviews SET user_id = $1 WHERE org_id = $2 AND user_id = $3`,
+		toUUID, orgUUID, fromUUID,
+	)
+	return err
+}
+
+func (r *Repository) ValidateMemberRemoval(ctx context.Context, orgID, userID string) error {
+	orgUUID, err := uuid.Parse(orgID)
+	if err != nil {
+		return ErrNotFound
+	}
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	var role string
+	err = r.db.QueryRow(ctx,
+		`SELECT role FROM organization_members WHERE org_id = $1 AND user_id = $2`,
+		orgUUID, userUUID,
+	).Scan(&role)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+
+	if role == orgModel.MemberRoleAdmin {
+		var adminCount int
+		if err := r.db.QueryRow(ctx,
+			`SELECT COUNT(*) FROM organization_members WHERE org_id = $1 AND role = $2`,
+			orgUUID, orgModel.MemberRoleAdmin,
+		).Scan(&adminCount); err != nil {
+			return err
+		}
+		if adminCount <= 1 {
+			return ErrLastAdmin
+		}
+	}
+	return nil
+}
+
+func (r *Repository) ListMemberUserIDs(ctx context.Context, orgID string) ([]string, error) {
+	orgUUID, err := uuid.Parse(orgID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	rows, err := r.db.Query(ctx,
+		`SELECT user_id FROM organization_members WHERE org_id = $1`,
+		orgUUID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var uid uuid.UUID
+		if err := rows.Scan(&uid); err != nil {
+			return nil, err
+		}
+		out = append(out, uid.String())
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) DeleteOrgReviews(ctx context.Context, orgID string) error {
+	orgUUID, err := uuid.Parse(orgID)
+	if err != nil {
+		return ErrNotFound
+	}
+	_, err = r.db.Exec(ctx, `DELETE FROM reviews WHERE org_id = $1`, orgUUID)
+	return err
+}
+
+func (r *Repository) DeleteOrganization(ctx context.Context, orgID string) error {
+	orgUUID, err := uuid.Parse(orgID)
+	if err != nil {
+		return ErrNotFound
+	}
+	tag, err := r.db.Exec(ctx, `DELETE FROM organizations WHERE id = $1`, orgUUID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func normalizeInviteEmail(email string) string {

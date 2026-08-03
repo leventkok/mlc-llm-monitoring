@@ -242,6 +242,11 @@ export const orgAdminApi = {
       body: JSON.stringify({ name }),
     }),
 
+  deleteOrganization: (orgId: string) =>
+    request<{ message: string }>(`/admin/organizations/${orgId}`, {
+      method: "DELETE",
+    }),
+
   listInvites: (orgId: string) =>
     request<OrgInvite[]>(`/admin/organizations/${orgId}/invites`),
 
@@ -257,6 +262,11 @@ export const orgAdminApi = {
 
 export const orgApi = {
   listMembers: () => request<OrgMember[]>("/organization/members"),
+
+  removeMember: (userId: string) =>
+    request<{ message: string }>(`/organization/members/${userId}`, {
+      method: "DELETE",
+    }),
 
   listInvites: () => request<OrgInvite[]>("/organization/invites"),
 
