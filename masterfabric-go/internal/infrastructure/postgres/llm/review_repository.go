@@ -206,15 +206,10 @@ SELECT
       SELECT d.sentiment, count(*)::int AS cnt FROM ` + decisionJoin + ` WHERE ` + reviewWhere + ` GROUP BY d.sentiment
    ) s)`
 
-	expanded := make([]any, 0, len(args)*8)
-	for i := 0; i < 8; i++ {
-		expanded = append(expanded, args...)
-	}
-
 	var m model.Metrics
 	var catJSON, sentJSON string
 	var compliant int
-	err := r.pool.QueryRow(ctx, query, expanded...).Scan(
+	err := r.pool.QueryRow(ctx, query, args...).Scan(
 		&m.TotalReviews,
 		&m.TotalDecisions,
 		&m.TotalScores,
