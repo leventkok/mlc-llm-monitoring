@@ -51,6 +51,18 @@ export default function MonitoringPage() {
     load().catch(() => {});
   }, [load]);
 
+  useEffect(() => {
+    const onFocus = () => {
+      load().catch(() => {});
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [load]);
+
   const reviewsById = useMemo(() => {
     const map: Record<string, Review> = {};
     for (const r of reviews) map[r.id] = r;

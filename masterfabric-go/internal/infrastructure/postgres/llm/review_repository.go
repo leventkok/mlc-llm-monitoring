@@ -240,28 +240,29 @@ SELECT
 
 func reviewWhereArgs(scope model.ReviewScope) (string, []any) {
 	if scope.IsOrg() {
-		return `org_id = $1`, []any{scope.OrgID}
+		// Org workspace + member's legacy personal rows (org_id NULL before backfill).
+		return `(org_id = $1 OR (org_id IS NULL AND user_id = $2))`, []any{scope.OrgID, scope.UserID}
 	}
 	return `user_id = $1 AND org_id IS NULL`, []any{scope.UserID}
 }
 
 func reviewJoinWhereArgs(scope model.ReviewScope) (string, []any) {
 	if scope.IsOrg() {
-		return `r.org_id = $1`, []any{scope.OrgID}
+		return `(r.org_id = $1 OR (r.org_id IS NULL AND r.user_id = $2))`, []any{scope.OrgID, scope.UserID}
 	}
 	return `r.user_id = $1 AND r.org_id IS NULL`, []any{scope.UserID}
 }
 
 func reviewExistsFilter(scope model.ReviewScope, startArg int) (string, []any) {
 	if scope.IsOrg() {
-		return `org_id = $` + itoa(startArg), []any{scope.OrgID}
+		return `(org_id = $` + itoa(startArg) + ` OR (org_id IS NULL AND user_id = $` + itoa(startArg+1) + `))`, []any{scope.OrgID, scope.UserID}
 	}
 	return `user_id = $` + itoa(startArg) + ` AND org_id IS NULL`, []any{scope.UserID}
 }
 
 func reviewJoinFilter(scope model.ReviewScope, startArg int) (string, []any) {
 	if scope.IsOrg() {
-		return `r.org_id = $` + itoa(startArg), []any{scope.OrgID}
+		return `(r.org_id = $` + itoa(startArg) + ` OR (r.org_id IS NULL AND r.user_id = $` + itoa(startArg+1) + `))`, []any{scope.OrgID, scope.UserID}
 	}
 	return `r.user_id = $` + itoa(startArg) + ` AND r.org_id IS NULL`, []any{scope.UserID}
 }
@@ -275,7 +276,7 @@ func scopeListQuery(base string, scope model.ReviewScope, limit, offset int) (st
 
 func scopeOneQuery(base string, id string, scope model.ReviewScope) (string, []any) {
 	if scope.IsOrg() {
-		return base + ` AND org_id = $2`, []any{id, scope.OrgID}
+		return base + ` AND (org_id = $2 OR (org_id IS NULL AND user_id = $3))`, []any{id, scope.OrgID, scope.UserID}
 	}
 	return base + ` AND user_id = $2 AND org_id IS NULL`, []any{id, scope.UserID}
 }

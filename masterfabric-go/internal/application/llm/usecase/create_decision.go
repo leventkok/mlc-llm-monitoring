@@ -53,9 +53,7 @@ func (uc *CreateDecisionUseCase) Execute(ctx context.Context, scope model.Review
 		return model.Decision{}, errors.New("could not save decision")
 	}
 
-	if err := persistAutoScore(ctx, uc.reviews, scope, decision); err != nil {
-		return model.Decision{}, errors.New("could not save auto score")
-	}
+	_ = persistAutoScore(ctx, uc.reviews, scope, decision)
 
 	metrics.RecordDecision(decision.Category, decision.Sentiment)
 

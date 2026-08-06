@@ -83,6 +83,9 @@ func run() error {
 	if err := database.BackfillRoles(ctx, db); err != nil {
 		return fmt.Errorf("role backfill failed: %w", err)
 	}
+	if err := database.BackfillMissingAutoScores(ctx, db); err != nil {
+		return fmt.Errorf("score backfill failed: %w", err)
+	}
 	log.Info("database schema ready")
 
 	if err := health.PingDB(ctx, db); err != nil {
