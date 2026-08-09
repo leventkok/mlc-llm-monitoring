@@ -20,7 +20,7 @@ import (
 )
 
 type Classifier interface {
-	ClassifyReviewBatch(ctx context.Context, items []infraMLC.BatchReviewInput) ([]infraMLC.BatchClassification, error)
+	ClassifyReview(ctx context.Context, text string) (infraMLC.Classification, error)
 	CompleteJSON(ctx context.Context, prompt string, maxTokens int) (string, error)
 }
 
@@ -257,7 +257,9 @@ func (s *Service) runAudit(auditID, userID, orgID string) {
 	}
 	stats = enrichStatistics(stats)
 	samples, _ := s.repo.SampleNegativeReviews(ctx, auditID, 60)
-	if err := s.generateInsights(ctx, auditID, a, stats, samples); err != nil {
+	vertical := detectAppVertical(a.AppDisplayName, a.ClientName, samples)
+	stats = enrichStatisticsForVertical(stats, vertical)
+	if err := s.generateInsights(ctx, auditID, a, stats, samples, vertical); err != nil {
 		fail(err.Error())
 		return
 	}
@@ -311,23 +313,24 @@ func (s *Service) batchClassify(ctx context.Context, auditID string) (int, error
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
-				results, err := s.mlc.ClassifyReviewBatch(ctx, jb.items)
-				if err != nil {
-					errCh <- err
-					return
-				}
-				for _, res := range results {
-					if err := s.repo.UpdateReviewClassification(ctx, res.ID, res.Category, res.Sentiment, res.RawOutput); err != nil {
+				for _, rv := range jb.reviews {
+					cls, err := s.mlc.ClassifyReview(ctx, rv.Text)
+					if err != nil {
 						errCh <- err
 						return
 					}
+					if err := s.repo.UpdateReviewClassification(ctx, rv.ID, cls.Category, cls.Sentiment, cls.RawOutput); err != nil {
+						errCh <- err
+						return
+					}
+					mu.Lock()
+					total++
+					cur := total
+					mu.Unlock()
+					_ = s.repo.UpdateProgress(ctx, auditID, map[string]any{
+						"analyzed_count": cur, "play_fetched": -1, "appstore_fetched": -1, "total_reviews": -1,
+					})
 				}
-				mu.Lock()
-				total += len(results)
-				mu.Unlock()
-				_ = s.repo.UpdateProgress(ctx, auditID, map[string]any{
-					"analyzed_count": total, "play_fetched": -1, "appstore_fetched": -1, "total_reviews": -1,
-				})
 			}(jb)
 		}
 		wg.Wait()
@@ -340,7 +343,7 @@ func (s *Service) batchClassify(ctx context.Context, auditID string) (int, error
 	}
 }
 
-func (s *Service) generateInsights(ctx context.Context, auditID string, a auditModel.Audit, stats auditModel.Statistics, samples []auditModel.Review) error {
+func (s *Service) generateInsights(ctx context.Context, auditID string, a auditModel.Audit, stats auditModel.Statistics, samples []auditModel.Review, vertical appVertical) error {
 	statsJSON, _ := json.Marshal(stats)
 	var sampleLines strings.Builder
 	for i, rv := range samples {
@@ -351,53 +354,64 @@ func (s *Service) generateInsights(ctx context.Context, auditID string, a auditM
 	}
 
 	goal := stretchGoalRating(stats.AvgRating)
-	baseMeta := fallbackReportMeta(stats, fallbackRootCauses(stats, samples), a.AppDisplayName)
+	baseMeta := fallbackReportMeta(stats, fallbackRootCauses(stats, samples, vertical), a.AppDisplayName, vertical)
 
-	prompt := fmt.Sprintf(`Sen mobil uygulama danışmanısın. "%s" (müşteri: %s) için Türkçe müşteri sunumu raporu üret.
-Mevcut yazılı yorum ortalaması: %.2f. Anlamlı iyileşme hedefi (sabit 4.8 kullanma): %.1f.
+	prompt := fmt.Sprintf(`Sen mobil uygulama danışmanısın. Aşağıdaki uygulama için Türkçe müşteri sunumu raporu üret.
+
+Uygulama: "%s"
+Müşteri/marka: "%s"
+Sektör/vertical: %s
+Mevcut yazılı yorum ortalaması: %.2f
+Anlamlı iyileşme hedefi (sabit 4.8 veya başka marka hedefi YAZMA): ~%.1f
+
+ZORUNLU kurallar:
+- Sadece verilen uygulama ve yorum örneklerine dayan; Avva, e-ticaret kargo/iade/beden şablonunu %s vertical için KULLANMA.
+- root_causes temaları yorumlarda geçen gerçek şikayetlerden türet (paywall, crash, progression, monetization vb. oyunda; kargo/iade vb. e-ticarette).
+- timeline ve action_plan sektöre uygun olsun.
+- Başka marka veya uygulama adı geçirme.
+
 SADECE geçerli JSON döndür:
 {
-  "executive_summary": "max 180 kelime yönetim özeti",
-  "callout": "tek paragraf kritik özet",
+  "executive_summary": "max 180 kelime",
+  "callout": "tek paragraf",
   "root_causes": [{"theme":"","description":"","affected_rating":"1-3","sample_count":0,"examples":["",""]}],
-  "scenarios": [{"id":"A|B|C","label":"Yavaş|Orta|Önerilen","pace":"slow|mid|fast","title":"","summary":"","timeline":"","highlight":""}],
+  "scenarios": [{"id":"A|B|C","label":"","pace":"slow|mid|fast","title":"","summary":"","timeline":"","highlight":""}],
   "timeline": [{"horizon":"0-30 gün","tag":"fast|mid|hard","title":"","body":""}],
   "priorities": [{"rank":1,"title":"","body":""}],
   "management_findings": [{"title":"","body":""}],
-  "action_plan": [{"priority":"P0|P1|P2","horizon_days":"0-30|31-60|61-90","title":"","action":"","owner_hint":"","expected_impact":"","tag":"fast|mid|hard"}]
+  "action_plan": [{"priority":"P0|P1|P2","horizon_days":"","title":"","action":"","owner_hint":"","expected_impact":"","tag":""}]
 }
-Kurallar:
-- 4.8 veya sabit hedef puan yazma; hedef ~%.1f olsun.
-- Senaryolar gerçekçi hacim/timeline içersin.
-- root_causes en az 3, action_plan en az 4 madde.
+
 İstatistikler: %s
-Örnek olumsuz yorumlar:
-%s`, a.AppDisplayName, a.ClientName, stats.AvgRating, goal, goal, string(statsJSON), sampleLines.String())
+Sınıflandırılmış olumsuz örnekler:
+%s`, a.AppDisplayName, a.ClientName, verticalLabel(vertical), stats.AvgRating, goal,
+		vertical, string(statsJSON), sampleLines.String())
 
 	raw, err := s.mlc.CompleteJSON(ctx, prompt, 2200)
-	rootCauses := fallbackRootCauses(stats, samples)
+	rootCauses := fallbackRootCauses(stats, samples, vertical)
 	actionPlan := fallbackActionPlan(baseMeta)
 	meta := baseMeta
-	summary := fmt.Sprintf("%s için %d yazılı yorum analizi tamamlandı. Ortalama puan %.2f; odak alanları ürün kalitesi ve operasyon.", a.AppDisplayName, stats.TotalReviews, stats.AvgRating)
+	summary := buildFallbackSummary(a, stats, vertical)
 
 	if err == nil {
 		if llmMeta, llmRoot, llmPlan, llmSummary, parseErr := parseInsightBundle(raw); parseErr == nil {
+			llmMeta = sanitizeReportMeta(llmMeta, vertical, a.AppDisplayName)
 			meta = mergeReportMeta(baseMeta, llmMeta, stats)
 			if len(llmRoot) > 0 {
-				rootCauses = llmRoot
+				rootCauses = sanitizeRootCauses(llmRoot, vertical)
 			}
 			if len(llmPlan) > 0 {
-				actionPlan = llmPlan
+				actionPlan = sanitizeActionPlan(llmPlan, vertical)
 			}
-			if strings.TrimSpace(llmSummary) != "" {
+			if strings.TrimSpace(llmSummary) != "" && !mentionsForeignBrand(llmSummary, a.AppDisplayName, a.ClientName) {
 				summary = strings.TrimSpace(llmSummary)
 			}
 		} else {
 			if rc := parseRootCauses(raw); len(rc) > 0 {
-				rootCauses = rc
+				rootCauses = sanitizeRootCauses(rc, vertical)
 			}
 			if ap := parseActionPlan(raw); len(ap) > 0 {
-				actionPlan = ap
+				actionPlan = sanitizeActionPlan(ap, vertical)
 			}
 		}
 	}
