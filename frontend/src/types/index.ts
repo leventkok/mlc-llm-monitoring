@@ -218,6 +218,7 @@ export interface AuditInsights {
   statistics: Record<string, unknown>;
   root_causes: Array<Record<string, unknown>>;
   action_plan: Array<Record<string, unknown>>;
+  report_meta?: Record<string, unknown>;
   generated_at: string;
 }
 

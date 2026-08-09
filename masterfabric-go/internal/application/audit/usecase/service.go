@@ -163,6 +163,12 @@ func (s *Service) GetReport(ctx context.Context, userID, auditID string) (auditD
 		ActionPlan:       plan,
 		GeneratedAt:      ins.GeneratedAt.UTC().Format(time.RFC3339),
 	}
+	if ins.Statistics.ReportMeta != nil {
+		b, _ := json.Marshal(ins.Statistics.ReportMeta)
+		var meta map[string]any
+		_ = json.Unmarshal(b, &meta)
+		resp.Insights.ReportMeta = meta
+	}
 	return resp, nil
 }
 
@@ -249,6 +255,7 @@ func (s *Service) runAudit(auditID, userID, orgID string) {
 		fail("could not compute statistics")
 		return
 	}
+	stats = enrichStatistics(stats)
 	samples, _ := s.repo.SampleNegativeReviews(ctx, auditID, 60)
 	if err := s.generateInsights(ctx, auditID, a, stats, samples); err != nil {
 		fail(err.Error())
@@ -343,41 +350,65 @@ func (s *Service) generateInsights(ctx context.Context, auditID string, a auditM
 		sampleLines.WriteString(fmt.Sprintf("- [%s %d★ %s/%s] %q\n", rv.Store, rv.Rating, rv.Category, rv.Sentiment, truncate(rv.Text, 180)))
 	}
 
-	rootPrompt := fmt.Sprintf(`You are a consulting analyst. Given app review statistics and sample negative reviews for "%s" (client: %s), return ONLY JSON:
-{"root_causes":[{"theme":"","description":"","affected_rating":"1-3","sample_count":0,"examples":["",""]}]}
-Statistics: %s
-Sample reviews:
-%s`, a.AppDisplayName, a.ClientName, string(statsJSON), sampleLines.String())
+	goal := stretchGoalRating(stats.AvgRating)
+	baseMeta := fallbackReportMeta(stats, fallbackRootCauses(stats, samples), a.AppDisplayName)
 
-	rootRaw, err := s.mlc.CompleteJSON(ctx, rootPrompt, 1400)
-	if err != nil {
-		return err
-	}
-	rootCauses := parseRootCauses(rootRaw)
+	prompt := fmt.Sprintf(`Sen mobil uygulama danışmanısın. "%s" (müşteri: %s) için Türkçe müşteri sunumu raporu üret.
+Mevcut yazılı yorum ortalaması: %.2f. Anlamlı iyileşme hedefi (sabit 4.8 kullanma): %.1f.
+SADECE geçerli JSON döndür:
+{
+  "executive_summary": "max 180 kelime yönetim özeti",
+  "callout": "tek paragraf kritik özet",
+  "root_causes": [{"theme":"","description":"","affected_rating":"1-3","sample_count":0,"examples":["",""]}],
+  "scenarios": [{"id":"A|B|C","label":"Yavaş|Orta|Önerilen","pace":"slow|mid|fast","title":"","summary":"","timeline":"","highlight":""}],
+  "timeline": [{"horizon":"0-30 gün","tag":"fast|mid|hard","title":"","body":""}],
+  "priorities": [{"rank":1,"title":"","body":""}],
+  "management_findings": [{"title":"","body":""}],
+  "action_plan": [{"priority":"P0|P1|P2","horizon_days":"0-30|31-60|61-90","title":"","action":"","owner_hint":"","expected_impact":"","tag":"fast|mid|hard"}]
+}
+Kurallar:
+- 4.8 veya sabit hedef puan yazma; hedef ~%.1f olsun.
+- Senaryolar gerçekçi hacim/timeline içersin.
+- root_causes en az 3, action_plan en az 4 madde.
+İstatistikler: %s
+Örnek olumsuz yorumlar:
+%s`, a.AppDisplayName, a.ClientName, stats.AvgRating, goal, goal, string(statsJSON), sampleLines.String())
 
-	planPrompt := fmt.Sprintf(`Create a 90-day prioritized action plan for mobile app "%s" (client: %s).
-Return ONLY JSON: {"action_plan":[{"priority":"P0|P1|P2","horizon_days":"0-30|31-60|61-90","action":"","owner_hint":"","expected_impact":""}]}
-Root causes: %s
-Statistics: %s`, a.AppDisplayName, a.ClientName, rootRaw, string(statsJSON))
-	planRaw, err := s.mlc.CompleteJSON(ctx, planPrompt, 1400)
-	if err != nil {
-		return err
-	}
-	actionPlan := parseActionPlan(planRaw)
+	raw, err := s.mlc.CompleteJSON(ctx, prompt, 2200)
+	rootCauses := fallbackRootCauses(stats, samples)
+	actionPlan := fallbackActionPlan(baseMeta)
+	meta := baseMeta
+	summary := fmt.Sprintf("%s için %d yazılı yorum analizi tamamlandı. Ortalama puan %.2f; odak alanları ürün kalitesi ve operasyon.", a.AppDisplayName, stats.TotalReviews, stats.AvgRating)
 
-	summaryPrompt := fmt.Sprintf(`Write a concise executive summary (max 180 words, Turkish) for a client presentation about app "%s" (%s).
-Include overall sentiment, top issues, and recommended focus. Return plain text only.
-Statistics: %s
-Root causes JSON: %s
-Action plan JSON: %s`, a.AppDisplayName, a.ClientName, string(statsJSON), rootRaw, planRaw)
-	summary, err := s.mlc.CompleteJSON(ctx, summaryPrompt, 400)
-	if err != nil {
-		return err
+	if err == nil {
+		if llmMeta, llmRoot, llmPlan, llmSummary, parseErr := parseInsightBundle(raw); parseErr == nil {
+			meta = mergeReportMeta(baseMeta, llmMeta, stats)
+			if len(llmRoot) > 0 {
+				rootCauses = llmRoot
+			}
+			if len(llmPlan) > 0 {
+				actionPlan = llmPlan
+			}
+			if strings.TrimSpace(llmSummary) != "" {
+				summary = strings.TrimSpace(llmSummary)
+			}
+		} else {
+			if rc := parseRootCauses(raw); len(rc) > 0 {
+				rootCauses = rc
+			}
+			if ap := parseActionPlan(raw); len(ap) > 0 {
+				actionPlan = ap
+			}
+		}
 	}
+
+	meta.CurrentAvgRating = stats.AvgRating
+	meta.StretchGoalRating = stretchGoalRating(stats.AvgRating)
+	stats.ReportMeta = &meta
 
 	return s.repo.SaveInsights(ctx, auditModel.Insights{
 		AuditID:          auditID,
-		ExecutiveSummary: strings.TrimSpace(summary),
+		ExecutiveSummary: summary,
 		Statistics:       stats,
 		RootCauses:       rootCauses,
 		ActionPlan:       actionPlan,

@@ -55,5 +55,6 @@ type InsightsDTO struct {
 	Statistics       map[string]any         `json:"statistics"`
 	RootCauses       []map[string]any       `json:"root_causes"`
 	ActionPlan       []map[string]any       `json:"action_plan"`
+	ReportMeta       map[string]any         `json:"report_meta,omitempty"`
 	GeneratedAt      string                 `json:"generated_at"`
 }

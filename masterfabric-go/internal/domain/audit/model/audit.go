@@ -64,6 +64,10 @@ type Statistics struct {
 	CategoryCounts map[string]int     `json:"category_counts"`
 	SentimentCounts map[string]int    `json:"sentiment_counts"`
 	RatingCounts   map[string]int     `json:"rating_counts"`
+	RatingDistribution []RatingBucket `json:"rating_distribution,omitempty"`
+	SentimentBreakdown   map[string]SentimentBucket `json:"sentiment_breakdown,omitempty"`
+	ThemeIntensity       []ThemeIntensity           `json:"theme_intensity,omitempty"`
+	ReportMeta             *ReportMeta                `json:"report_meta,omitempty"`
 }
 
 type RootCause struct {
@@ -80,6 +84,64 @@ type ActionItem struct {
 	Action         string `json:"action"`
 	OwnerHint      string `json:"owner_hint"`
 	ExpectedImpact string `json:"expected_impact"`
+	Tag            string `json:"tag,omitempty"`
+	Title          string `json:"title,omitempty"`
+}
+
+type RatingBucket struct {
+	Star  int     `json:"star"`
+	Count int     `json:"count"`
+	Pct   float64 `json:"pct"`
+}
+
+type SentimentBucket struct {
+	Count int     `json:"count"`
+	Pct   float64 `json:"pct"`
+}
+
+type ThemeIntensity struct {
+	Theme   string  `json:"theme"`
+	Label   string  `json:"label"`
+	Count   int     `json:"count"`
+	Pct     float64 `json:"pct"`
+}
+
+type ImprovementScenario struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Pace        string `json:"pace"`
+	Title       string `json:"title"`
+	Summary     string `json:"summary"`
+	Timeline    string `json:"timeline"`
+	Highlight   string `json:"highlight,omitempty"`
+}
+
+type TimelineItem struct {
+	Horizon string `json:"horizon"`
+	Tag     string `json:"tag"`
+	Title   string `json:"title"`
+	Body    string `json:"body"`
+}
+
+type PriorityItem struct {
+	Rank  int    `json:"rank"`
+	Title string `json:"title"`
+	Body  string `json:"body"`
+}
+
+type ManagementFinding struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
+}
+
+type ReportMeta struct {
+	Callout            string                `json:"callout"`
+	CurrentAvgRating   float64               `json:"current_avg_rating"`
+	StretchGoalRating  float64               `json:"stretch_goal_rating"`
+	Scenarios          []ImprovementScenario `json:"scenarios"`
+	Timeline           []TimelineItem        `json:"timeline"`
+	Priorities         []PriorityItem        `json:"priorities"`
+	ManagementFindings []ManagementFinding   `json:"management_findings"`
 }
 
 type Insights struct {
