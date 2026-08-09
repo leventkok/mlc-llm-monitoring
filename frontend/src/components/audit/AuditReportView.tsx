@@ -1,15 +1,30 @@
 import type { Audit, AuditInsights } from "@/types";
+import { DistributionBars } from "@/components/RichResult";
+import { categoryBadge, sentimentBadge } from "@/lib/badges";
 
 type Bucket = { star?: number; count?: number; pct?: number };
 type SentimentBucket = { count?: number; pct?: number };
-type Theme = { theme?: string; label?: string; count?: number; pct?: number };
-type Scenario = {
-  id?: string;
+type ReviewQuote = { text?: string; rating?: number; store?: string; sentiment?: string };
+type CategoryInsight = {
+  category?: string;
   label?: string;
-  pace?: string;
+  count?: number;
+  pct?: number;
+  reviews?: ReviewQuote[];
+};
+type FeedbackSuggestion = {
   title?: string;
   summary?: string;
-  timeline?: string;
+  category?: string;
+  priority?: string;
+  supporting_reviews?: ReviewQuote[];
+};
+type FeaturedReview = {
+  text?: string;
+  rating?: number;
+  store?: string;
+  category?: string;
+  sentiment?: string;
   highlight?: string;
 };
 type TimelineItem = { horizon?: string; tag?: string; title?: string; body?: string };
@@ -29,12 +44,6 @@ function tagClass(tag?: string) {
   if (tag === "fast") return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
   if (tag === "hard") return "bg-red-500/10 text-red-500 border-red-500/20";
   return "bg-amber-500/10 text-amber-500 border-amber-500/20";
-}
-
-function paceLabel(pace?: string) {
-  if (pace === "slow") return "Yavaş";
-  if (pace === "fast") return "Önerilen";
-  return "Orta";
 }
 
 function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -71,20 +80,133 @@ function BarRow({ label, pct, count, tone }: { label: string; pct: number; count
   );
 }
 
+function ReviewQuotes({ quotes }: { quotes: ReviewQuote[] }) {
+  if (!quotes.length) return null;
+  return (
+    <div className="mt-3 space-y-2">
+      {quotes.map((q, i) => (
+        <blockquote
+          key={i}
+          className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-muted"
+        >
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <span className="font-mono text-xs text-foreground">{q.rating ?? "?"}★</span>
+            {q.store && <span className="font-mono text-[10px] uppercase text-muted">{q.store}</span>}
+            {q.sentiment && (
+              <span className={`rounded border px-1.5 py-0.5 text-[10px] ${sentimentBadge(String(q.sentiment))}`}>
+                {q.sentiment}
+              </span>
+            )}
+          </div>
+          <p className="leading-relaxed text-foreground">&ldquo;{q.text}&rdquo;</p>
+        </blockquote>
+      ))}
+    </div>
+  );
+}
+
+function CategoryChart({ insights: cats, total }: { insights: CategoryInsight[]; total: number }) {
+  const counts: Record<string, number> = {};
+  const labels: Record<string, string> = {};
+  for (const c of cats) {
+    const key = c.category || "other";
+    counts[key] = Number(c.count ?? 0);
+    labels[key] = String(c.label || key);
+  }
+  if (Object.keys(counts).length === 0) return null;
+
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const max = entries[0]?.[1] || 1;
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Panel>
+        <h3 className="mb-4 font-mono text-xs uppercase tracking-wider text-muted">Kategori dağılımı</h3>
+        <DistributionBars counts={counts} total={total || 1} />
+      </Panel>
+      <Panel>
+        <h3 className="mb-4 font-mono text-xs uppercase tracking-wider text-muted">Kategori yoğunluğu</h3>
+        <div className="flex items-end gap-3" style={{ minHeight: 180 }}>
+          {entries.map(([key, count]) => {
+            const pct = max > 0 ? (count / max) * 100 : 0;
+            const color =
+              key === "bug"
+                ? "bg-red-500"
+                : key === "feature"
+                  ? "bg-blue-500"
+                  : key === "praise"
+                    ? "bg-emerald-500"
+                    : "bg-accent";
+            return (
+              <div key={key} className="flex flex-1 flex-col items-center gap-2">
+                <span className="font-mono text-xs text-foreground">{count}</span>
+                <div className="flex w-full flex-col justify-end rounded-t-md bg-surface-2" style={{ height: 140 }}>
+                  <div className={`w-full rounded-t-md ${color}`} style={{ height: `${Math.max(pct, 6)}%` }} />
+                </div>
+                <span className="text-center text-[10px] leading-tight text-muted">{labels[key] || key}</span>
+              </div>
+            );
+          })}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+function SuggestionList({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: FeedbackSuggestion[];
+  tone: "feature" | "bug";
+}) {
+  if (!items.length) return null;
+  return (
+    <Panel>
+      <h3 className="font-mono text-xs uppercase tracking-wider text-muted">{title}</h3>
+      <div className="mt-4 space-y-4">
+        {items.map((item, i) => (
+          <div key={i} className="border-b border-border pb-4 last:border-0">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <h4 className="font-medium text-foreground">{item.title}</h4>
+              <div className="flex gap-2">
+                <span className={`rounded border px-2 py-0.5 text-[10px] uppercase ${categoryBadge(tone)}`}>
+                  {tone}
+                </span>
+                {item.priority && (
+                  <span className="rounded border border-accent/30 bg-accent/5 px-2 py-0.5 font-mono text-[10px] text-accent">
+                    {item.priority}
+                  </span>
+                )}
+              </div>
+            </div>
+            {item.summary && <p className="mt-2 text-sm text-muted">{item.summary}</p>}
+            <ReviewQuotes quotes={list<ReviewQuote>(item.supporting_reviews)} />
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
 export default function AuditReportView({ audit, insights }: { audit: Audit; insights: AuditInsights }) {
   const stats = insights.statistics ?? {};
   const meta = (insights.report_meta ?? stats.report_meta ?? {}) as Record<string, unknown>;
   const ratingDist = list<Bucket>(stats.rating_distribution);
   const sentiment = (stats.sentiment_breakdown ?? {}) as Record<string, SentimentBucket>;
-  const themes = list<Theme>(stats.theme_intensity);
-  const rootCauses = insights.root_causes ?? [];
-  const scenarios = list<Scenario>(meta.scenarios);
+  const categoryInsights = list<CategoryInsight>(insights.category_insights);
+  const featureSuggestions = list<FeedbackSuggestion>(insights.feature_suggestions);
+  const bugSuggestions = list<FeedbackSuggestion>(insights.bug_suggestions);
+  const featuredReviews = list<FeaturedReview>(insights.featured_reviews);
   const timeline = list<TimelineItem>(meta.timeline);
   const priorities = list<Priority>(meta.priorities);
   const findings = list<Finding>(meta.management_findings);
   const currentAvg = Number(meta.current_avg_rating ?? stats.avg_rating ?? 0);
   const stretchGoal = Number(meta.stretch_goal_rating ?? Math.min(5, currentAvg + 0.45));
   const callout = String(meta.callout ?? "");
+  const totalReviews = Number(stats.total_reviews ?? audit.total_reviews ?? 0);
 
   const playCount = Number(stats.play_count ?? audit.play_fetched ?? 0);
   const appStoreCount = Number(stats.appstore_count ?? audit.appstore_fetched ?? 0);
@@ -119,7 +241,7 @@ export default function AuditReportView({ audit, insights }: { audit: Audit; ins
       </header>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Yazılı yorum" value={String(stats.total_reviews ?? audit.total_reviews)} hint="Analiz edilen metin" />
+        <Stat label="Yazılı yorum" value={String(totalReviews)} hint="Analiz edilen metin" />
         <Stat label="Ort. puan" value={num(currentAvg)} hint="Yazılı yorum ortalaması" accent />
         <Stat label="Mevcut taban" value={num(currentAvg)} hint="İyileştirme başlangıcı" />
         <Stat label="Hedef bandı" value={`~${num(stretchGoal, 1)}`} hint="Veriye göre anlamlı hedef" accent />
@@ -180,75 +302,87 @@ export default function AuditReportView({ audit, insights }: { audit: Audit; ins
         </section>
       )}
 
-      {(themes.length > 0 || rootCauses.length > 0) && (
+      {categoryInsights.length > 0 && (
         <section>
-          <h2 className="text-lg font-medium text-foreground">Kök nedenler</h2>
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            {themes.length > 0 && (
-              <Panel>
-                <h3 className="mb-4 font-mono text-xs uppercase tracking-wider text-muted">Tema yoğunluğu</h3>
-                <div className="space-y-3">
-                  {themes.map((t, i) => (
-                    <div key={t.theme ?? i} className="text-sm">
-                      <div className="mb-1 flex justify-between gap-2">
-                        <span className="text-foreground">{t.label ?? t.theme}</span>
-                        <span className="font-mono text-xs text-muted">{t.count ?? 0}</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-surface-2">
-                        <div
-                          className="h-full rounded-full bg-red-500"
-                          style={{ width: `${Math.min(Number(t.pct ?? 0), 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Panel>
-            )}
-            <Panel>
-              <h3 className="mb-4 font-mono text-xs uppercase tracking-wider text-muted">Detaylı bulgular</h3>
-              <ul className="space-y-4">
-                {(rootCauses.length ? rootCauses : themes).map((raw, i) => {
-                  const rc = raw as Record<string, unknown>;
-                  return (
-                    <li key={i} className="border-b border-border pb-4 last:border-0">
-                      <p className="font-medium text-foreground">{String(rc.theme ?? rc.label ?? `Tema ${i + 1}`)}</p>
-                      <p className="mt-1 text-sm text-muted">
-                        {String(rc.description ?? "")}
-                        {rc.sample_count != null ? ` (${String(rc.sample_count)} örnek)` : ""}
-                      </p>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Panel>
+          <h2 className="text-lg font-medium text-foreground">Kategori analizi</h2>
+          <p className="mt-1 text-sm text-muted">
+            Sınıflandırılmış yorum kategorileri ve her kategoriden örnek alıntılar.
+          </p>
+          <div className="mt-5 space-y-4">
+            <CategoryChart insights={categoryInsights} total={totalReviews} />
+            <div className="grid gap-4 lg:grid-cols-2">
+              {categoryInsights.map((cat) => (
+                <Panel key={cat.category ?? cat.label}>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-medium text-foreground">{cat.label ?? cat.category}</h3>
+                    <span className="font-mono text-xs text-muted">
+                      {cat.count ?? 0} · %{num(cat.pct, 1)}
+                    </span>
+                  </div>
+                  <ReviewQuotes quotes={list<ReviewQuote>(cat.reviews)} />
+                </Panel>
+              ))}
+            </div>
           </div>
         </section>
       )}
 
-      {scenarios.length > 0 && (
+      {(featureSuggestions.length > 0 || bugSuggestions.length > 0) && (
         <section>
-          <h2 className="text-lg font-medium text-foreground">Hedefe giden senaryolar</h2>
+          <h2 className="text-lg font-medium text-foreground">Kullanıcı geri bildirimi</h2>
           <p className="mt-1 text-sm text-muted">
-            Mevcut {num(currentAvg)} ortalamadan ~{num(stretchGoal, 1)} bandına giden gerçekçi yollar.
+            Yorumlarla desteklenen özellik önerileri ve hata / şikâyet başlıkları.
           </p>
-          <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            {scenarios.map((s) => (
-              <Panel key={s.id ?? s.title}>
-                <span
-                  className={`inline-block rounded-md border px-2 py-0.5 text-[0.72rem] font-medium uppercase ${tagClass(
-                    s.pace === "slow" ? "hard" : s.pace === "fast" ? "fast" : "mid"
-                  )}`}
-                >
-                  {paceLabel(s.pace) || s.label}
-                </span>
-                <h3 className="mt-3 text-base font-medium text-foreground">{s.title}</h3>
-                <p className="mt-2 text-sm text-muted">{s.summary}</p>
-                {s.highlight && <p className="mt-3 text-sm font-medium text-accent">{s.highlight}</p>}
-                {s.timeline && <p className="mt-2 text-xs text-muted">Süre: {s.timeline}</p>}
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <SuggestionList title="Özellik önerileri (feature)" items={featureSuggestions} tone="feature" />
+            <SuggestionList title="Hata ve şikâyetler (bug)" items={bugSuggestions} tone="bug" />
+          </div>
+        </section>
+      )}
+
+      {featuredReviews.length > 0 && (
+        <section>
+          <h2 className="text-lg font-medium text-foreground">Öne çıkan yorumlar</h2>
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {featuredReviews.map((rv, i) => (
+              <Panel key={i}>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-sm text-foreground">{rv.rating ?? "?"}★</span>
+                  {rv.store && <span className="font-mono text-[10px] uppercase text-muted">{rv.store}</span>}
+                  {rv.category && (
+                    <span className={`rounded border px-1.5 py-0.5 text-[10px] ${categoryBadge(String(rv.category))}`}>
+                      {rv.category}
+                    </span>
+                  )}
+                  {rv.highlight && (
+                    <span className="rounded border border-accent/30 bg-accent/5 px-2 py-0.5 text-[10px] text-accent">
+                      {rv.highlight}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm leading-relaxed text-foreground">&ldquo;{rv.text}&rdquo;</p>
               </Panel>
             ))}
           </div>
+        </section>
+      )}
+
+      {priorities.length > 0 && (
+        <section>
+          <h2 className="text-lg font-medium text-foreground">Öncelik sırası</h2>
+          <Panel className="mt-5">
+            {priorities.map((p) => (
+              <div key={p.rank ?? p.title} className="grid grid-cols-[42px_1fr] gap-3 border-b border-border py-4 last:border-0">
+                <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl border border-accent/30 bg-accent/5 font-mono text-sm font-medium text-accent">
+                  {String(p.rank ?? "").padStart(2, "0")}
+                </div>
+                <div>
+                  <h4 className="font-medium text-foreground">{p.title}</h4>
+                  <p className="mt-1 text-sm text-muted">{p.body}</p>
+                </div>
+              </div>
+            ))}
+          </Panel>
         </section>
       )}
 
@@ -276,25 +410,6 @@ export default function AuditReportView({ audit, insights }: { audit: Audit; ins
               );
             })}
           </div>
-        </section>
-      )}
-
-      {priorities.length > 0 && (
-        <section>
-          <h2 className="text-lg font-medium text-foreground">Öncelik sırası</h2>
-          <Panel className="mt-5">
-            {priorities.map((p) => (
-              <div key={p.rank ?? p.title} className="grid grid-cols-[42px_1fr] gap-3 border-b border-border py-4 last:border-0">
-                <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl border border-accent/30 bg-accent/5 font-mono text-sm font-medium text-accent">
-                  {String(p.rank ?? "").padStart(2, "0")}
-                </div>
-                <div>
-                  <h4 className="font-medium text-foreground">{p.title}</h4>
-                  <p className="mt-1 text-sm text-muted">{p.body}</p>
-                </div>
-              </div>
-            ))}
-          </Panel>
         </section>
       )}
 

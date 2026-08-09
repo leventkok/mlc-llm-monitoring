@@ -182,12 +182,22 @@ func (s *Service) GetReport(ctx context.Context, userID, auditID string) (auditD
 		_ = json.Unmarshal(b, &m)
 		plan = append(plan, m)
 	}
+	toMaps := func(v any) []map[string]any {
+		b, _ := json.Marshal(v)
+		var arr []map[string]any
+		_ = json.Unmarshal(b, &arr)
+		return arr
+	}
 	resp.Insights = &auditDTO.InsightsDTO{
-		ExecutiveSummary: ins.ExecutiveSummary,
-		Statistics:       statsMap,
-		RootCauses:       root,
-		ActionPlan:       plan,
-		GeneratedAt:      ins.GeneratedAt.UTC().Format(time.RFC3339),
+		ExecutiveSummary:   ins.ExecutiveSummary,
+		Statistics:         statsMap,
+		RootCauses:         root,
+		ActionPlan:         plan,
+		CategoryInsights:   toMaps(ins.CategoryInsights),
+		FeatureSuggestions: toMaps(ins.FeatureSuggestions),
+		BugSuggestions:     toMaps(ins.BugSuggestions),
+		FeaturedReviews:    toMaps(ins.FeaturedReviews),
+		GeneratedAt:        ins.GeneratedAt.UTC().Format(time.RFC3339),
 	}
 	if ins.Statistics.ReportMeta != nil {
 		b, _ := json.Marshal(ins.Statistics.ReportMeta)
@@ -395,8 +405,14 @@ func (s *Service) generateInsights(ctx context.Context, auditID string, a auditM
 		sampleLines.WriteString(fmt.Sprintf("- [%s %d★ %s/%s] %q\n", rv.Store, rv.Rating, rv.Category, rv.Sentiment, truncate(rv.Text, 180)))
 	}
 
-	goal := stretchGoalRating(stats.AvgRating)
 	baseMeta := fallbackReportMeta(stats, fallbackRootCauses(stats, samples, vertical), a.AppDisplayName, vertical)
+	baseMeta.Scenarios = nil
+
+	classified, _ := s.repo.ListClassifiedReviews(ctx, auditID, 800)
+	categoryInsights := buildCategoryInsights(stats, classified, vertical)
+	featureSuggestions := buildFeatureSuggestions(classified)
+	bugSuggestions := buildBugSuggestions(classified)
+	featuredReviews := buildFeaturedReviews(classified)
 
 	prompt := fmt.Sprintf(`Sen mobil uygulama danışmanısın. Aşağıdaki uygulama için Türkçe müşteri sunumu raporu üret.
 
@@ -404,20 +420,25 @@ Uygulama: "%s"
 Müşteri/marka: "%s"
 Sektör/vertical: %s
 Mevcut yazılı yorum ortalaması: %.2f
-Anlamlı iyileşme hedefi (sabit 4.8 veya başka marka hedefi YAZMA): ~%.1f
 
 ZORUNLU kurallar:
-- Sadece verilen uygulama ve yorum örneklerine dayan; Avva, e-ticaret kargo/iade/beden şablonunu %s vertical için KULLANMA.
-- root_causes temaları yorumlarda geçen gerçek şikayetlerden türet (paywall, crash, progression, monetization vb. oyunda; kargo/iade vb. e-ticarette).
-- timeline ve action_plan sektöre uygun olsun.
-- Başka marka veya uygulama adı geçirme.
+- Sadece verilen yorum örneklerine dayan; uydurma özellik veya hata yazma.
+- feature_suggestions: kullanıcıların istediği özellikler (ör. "gemi sistemi olsun") — her biri supporting_reviews ile yorum alıntısı içersin.
+- bug_suggestions: crash, performans, monetization şikâyetleri — yorum alıntılarıyla destekle.
+- category_insights: bug/feature/praise/other kategorileri ve her biri için örnek yorum alıntıları.
+- featured_reviews: en dikkat çekici 4-6 yorum (olumlu + olumsuz karışık).
+- scenarios YAZMA.
+- timeline ve action_plan sektöre uygun olsun (%s).
 
 SADECE geçerli JSON döndür:
 {
   "executive_summary": "max 180 kelime",
   "callout": "tek paragraf",
   "root_causes": [{"theme":"","description":"","affected_rating":"1-3","sample_count":0,"examples":["",""]}],
-  "scenarios": [{"id":"A|B|C","label":"","pace":"slow|mid|fast","title":"","summary":"","timeline":"","highlight":""}],
+  "category_insights": [{"category":"bug|feature|praise|other","label":"","count":0,"pct":0,"reviews":[{"text":"","rating":1,"store":"play|appstore","sentiment":""}]}],
+  "feature_suggestions": [{"title":"","summary":"","category":"feature","priority":"P1","supporting_reviews":[{"text":"","rating":4,"store":"","sentiment":""}]}],
+  "bug_suggestions": [{"title":"","summary":"","category":"bug","priority":"P0","supporting_reviews":[{"text":"","rating":1,"store":"","sentiment":""}]}],
+  "featured_reviews": [{"text":"","rating":5,"store":"","category":"","sentiment":"","highlight":""}],
   "timeline": [{"horizon":"0-30 gün","tag":"fast|mid|hard","title":"","body":""}],
   "priorities": [{"rank":1,"title":"","body":""}],
   "management_findings": [{"title":"","body":""}],
@@ -425,11 +446,11 @@ SADECE geçerli JSON döndür:
 }
 
 İstatistikler: %s
-Sınıflandırılmış olumsuz örnekler:
-%s`, a.AppDisplayName, a.ClientName, verticalLabel(vertical), stats.AvgRating, goal,
-		vertical, string(statsJSON), sampleLines.String())
+Sınıflandırılmış yorum örnekleri:
+%s`, a.AppDisplayName, a.ClientName, verticalLabel(vertical), stats.AvgRating,
+		verticalLabel(vertical), string(statsJSON), sampleLines.String())
 
-	raw, err := s.mlc.CompleteJSON(ctx, prompt, 2200)
+	raw, err := s.mlc.CompleteJSON(ctx, prompt, 2800)
 	rootCauses := fallbackRootCauses(stats, samples, vertical)
 	actionPlan := fallbackActionPlan(baseMeta)
 	meta := baseMeta
@@ -438,7 +459,9 @@ Sınıflandırılmış olumsuz örnekler:
 	if err == nil {
 		if llmMeta, llmRoot, llmPlan, llmSummary, parseErr := parseInsightBundle(raw); parseErr == nil {
 			llmMeta = sanitizeReportMeta(llmMeta, vertical, a.AppDisplayName)
+			llmMeta.Scenarios = nil
 			meta = mergeReportMeta(baseMeta, llmMeta, stats)
+			meta.Scenarios = nil
 			if len(llmRoot) > 0 {
 				rootCauses = sanitizeRootCauses(llmRoot, vertical)
 			}
@@ -456,6 +479,11 @@ Sınıflandırılmış olumsuz örnekler:
 				actionPlan = sanitizeActionPlan(ap, vertical)
 			}
 		}
+		llmCats, llmFeat, llmBug, llmFeatured := parseFeedbackFromRaw(raw)
+		categoryInsights = mergeCategoryInsights(categoryInsights, llmCats)
+		featureSuggestions = mergeFeedbackSuggestions(featureSuggestions, llmFeat, "feature")
+		bugSuggestions = mergeFeedbackSuggestions(bugSuggestions, llmBug, "bug")
+		featuredReviews = mergeFeaturedReviews(featuredReviews, llmFeatured)
 	}
 
 	meta.CurrentAvgRating = stats.AvgRating
@@ -463,11 +491,15 @@ Sınıflandırılmış olumsuz örnekler:
 	stats.ReportMeta = &meta
 
 	return s.repo.SaveInsights(ctx, auditModel.Insights{
-		AuditID:          auditID,
-		ExecutiveSummary: summary,
-		Statistics:       stats,
-		RootCauses:       rootCauses,
-		ActionPlan:       actionPlan,
+		AuditID:            auditID,
+		ExecutiveSummary:   summary,
+		Statistics:         stats,
+		RootCauses:         rootCauses,
+		ActionPlan:         actionPlan,
+		CategoryInsights:   categoryInsights,
+		FeatureSuggestions: featureSuggestions,
+		BugSuggestions:     bugSuggestions,
+		FeaturedReviews:    featuredReviews,
 	})
 }
 

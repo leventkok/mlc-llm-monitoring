@@ -149,10 +149,46 @@ type ReportMeta struct {
 }
 
 type Insights struct {
-	AuditID           string
-	ExecutiveSummary  string
-	Statistics        Statistics
-	RootCauses        []RootCause
-	ActionPlan        []ActionItem
-	GeneratedAt       time.Time
+	AuditID            string
+	ExecutiveSummary   string
+	Statistics         Statistics
+	RootCauses         []RootCause
+	ActionPlan         []ActionItem
+	CategoryInsights   []CategoryInsight
+	FeatureSuggestions []FeedbackSuggestion
+	BugSuggestions     []FeedbackSuggestion
+	FeaturedReviews    []FeaturedReview
+	GeneratedAt        time.Time
+}
+
+type ReviewQuote struct {
+	Text      string `json:"text"`
+	Rating    int    `json:"rating"`
+	Store     string `json:"store"`
+	Sentiment string `json:"sentiment,omitempty"`
+}
+
+type CategoryInsight struct {
+	Category string        `json:"category"`
+	Label    string        `json:"label"`
+	Count    int           `json:"count"`
+	Pct      float64       `json:"pct"`
+	Reviews  []ReviewQuote `json:"reviews"`
+}
+
+type FeedbackSuggestion struct {
+	Title             string        `json:"title"`
+	Summary           string        `json:"summary"`
+	Category          string        `json:"category"`
+	Priority          string        `json:"priority,omitempty"`
+	SupportingReviews []ReviewQuote `json:"supporting_reviews"`
+}
+
+type FeaturedReview struct {
+	Text      string `json:"text"`
+	Rating    int    `json:"rating"`
+	Store     string `json:"store"`
+	Category  string `json:"category"`
+	Sentiment string `json:"sentiment"`
+	Highlight string `json:"highlight,omitempty"`
 }

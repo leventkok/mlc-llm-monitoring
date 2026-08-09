@@ -61,10 +61,14 @@ type ReportResponse struct {
 }
 
 type InsightsDTO struct {
-	ExecutiveSummary string                 `json:"executive_summary"`
-	Statistics       map[string]any         `json:"statistics"`
-	RootCauses       []map[string]any       `json:"root_causes"`
-	ActionPlan       []map[string]any       `json:"action_plan"`
-	ReportMeta       map[string]any         `json:"report_meta,omitempty"`
-	GeneratedAt      string                 `json:"generated_at"`
+	ExecutiveSummary   string                   `json:"executive_summary"`
+	Statistics         map[string]any           `json:"statistics"`
+	RootCauses         []map[string]any         `json:"root_causes"`
+	ActionPlan         []map[string]any         `json:"action_plan"`
+	CategoryInsights   []map[string]any         `json:"category_insights,omitempty"`
+	FeatureSuggestions []map[string]any         `json:"feature_suggestions,omitempty"`
+	BugSuggestions     []map[string]any         `json:"bug_suggestions,omitempty"`
+	FeaturedReviews    []map[string]any         `json:"featured_reviews,omitempty"`
+	ReportMeta         map[string]any           `json:"report_meta,omitempty"`
+	GeneratedAt        string                   `json:"generated_at"`
 }

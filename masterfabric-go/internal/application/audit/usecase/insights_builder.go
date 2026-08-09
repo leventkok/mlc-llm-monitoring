@@ -567,9 +567,6 @@ func mergeReportMeta(base, fromLLM auditModel.ReportMeta, stats auditModel.Stati
 	if fromLLM.Callout != "" {
 		base.Callout = fromLLM.Callout
 	}
-	if len(fromLLM.Scenarios) > 0 {
-		base.Scenarios = fromLLM.Scenarios
-	}
 	if len(fromLLM.Timeline) > 0 {
 		base.Timeline = fromLLM.Timeline
 	}
@@ -580,6 +577,24 @@ func mergeReportMeta(base, fromLLM auditModel.ReportMeta, stats auditModel.Stati
 		base.ManagementFindings = fromLLM.ManagementFindings
 	}
 	return base
+}
+
+func parseFeedbackFromRaw(raw string) ([]auditModel.CategoryInsight, []auditModel.FeedbackSuggestion, []auditModel.FeedbackSuggestion, []auditModel.FeaturedReview) {
+	start := strings.Index(raw, "{")
+	end := strings.LastIndex(raw, "}")
+	if start < 0 || end <= start {
+		return nil, nil, nil, nil
+	}
+	var payload struct {
+		CategoryInsights   []auditModel.CategoryInsight   `json:"category_insights"`
+		FeatureSuggestions []auditModel.FeedbackSuggestion `json:"feature_suggestions"`
+		BugSuggestions     []auditModel.FeedbackSuggestion `json:"bug_suggestions"`
+		FeaturedReviews    []auditModel.FeaturedReview    `json:"featured_reviews"`
+	}
+	if err := json.Unmarshal([]byte(raw[start:end+1]), &payload); err != nil {
+		return nil, nil, nil, nil
+	}
+	return payload.CategoryInsights, payload.FeatureSuggestions, payload.BugSuggestions, payload.FeaturedReviews
 }
 
 func roundPct(v float64) float64 {

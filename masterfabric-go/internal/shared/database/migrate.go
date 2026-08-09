@@ -154,6 +154,10 @@ var legacyMigrations = []string{
 	    action_plan        JSONB,
 	    generated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 	)`,
+	`ALTER TABLE audit_insights ADD COLUMN IF NOT EXISTS category_insights JSONB NOT NULL DEFAULT '[]'`,
+	`ALTER TABLE audit_insights ADD COLUMN IF NOT EXISTS feature_suggestions JSONB NOT NULL DEFAULT '[]'`,
+	`ALTER TABLE audit_insights ADD COLUMN IF NOT EXISTS bug_suggestions JSONB NOT NULL DEFAULT '[]'`,
+	`ALTER TABLE audit_insights ADD COLUMN IF NOT EXISTS featured_reviews JSONB NOT NULL DEFAULT '[]'`,
 }
 
 // MigrateAppSchema applies the app review monitoring schema on startup.

@@ -369,6 +369,53 @@ func (r *Repository) SampleNegativeReviews(ctx context.Context, auditID string, 
 	return out, rows.Err()
 }
 
+func (r *Repository) ListClassifiedReviews(ctx context.Context, auditID string, limit int) ([]auditModel.Review, error) {
+	auditUUID, err := uuid.Parse(auditID)
+	if err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 500
+	}
+	rows, err := r.db.Query(ctx,
+		`SELECT id, audit_id, store, store_review_id, app_name, rating, text, reviewed_at, category, sentiment, raw_output
+		 FROM audit_reviews WHERE audit_id = $1 AND category IS NOT NULL
+		 ORDER BY reviewed_at DESC NULLS LAST LIMIT $2`, auditUUID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanReviewRows(rows)
+}
+
+func scanReviewRows(rows pgx.Rows) ([]auditModel.Review, error) {
+	var out []auditModel.Review
+	for rows.Next() {
+		var rv auditModel.Review
+		var id, aid uuid.UUID
+		var reviewedAt *time.Time
+		var cat, sent, raw *string
+		if err := rows.Scan(&id, &aid, &rv.Store, &rv.StoreReviewID, &rv.AppName, &rv.Rating, &rv.Text,
+			&reviewedAt, &cat, &sent, &raw); err != nil {
+			return nil, err
+		}
+		rv.ID = id.String()
+		rv.AuditID = aid.String()
+		rv.ReviewedAt = reviewedAt
+		if cat != nil {
+			rv.Category = *cat
+		}
+		if sent != nil {
+			rv.Sentiment = *sent
+		}
+		if raw != nil {
+			rv.RawOutput = *raw
+		}
+		out = append(out, rv)
+	}
+	return out, rows.Err()
+}
+
 func (r *Repository) SaveInsights(ctx context.Context, insights auditModel.Insights) error {
 	auditUUID, err := uuid.Parse(insights.AuditID)
 	if err != nil {
@@ -377,16 +424,27 @@ func (r *Repository) SaveInsights(ctx context.Context, insights auditModel.Insig
 	statsJSON, _ := json.Marshal(insights.Statistics)
 	rootJSON, _ := json.Marshal(insights.RootCauses)
 	planJSON, _ := json.Marshal(insights.ActionPlan)
+	catJSON, _ := json.Marshal(insights.CategoryInsights)
+	featJSON, _ := json.Marshal(insights.FeatureSuggestions)
+	bugJSON, _ := json.Marshal(insights.BugSuggestions)
+	featRevJSON, _ := json.Marshal(insights.FeaturedReviews)
 	_, err = r.db.Exec(ctx,
-		`INSERT INTO audit_insights (audit_id, executive_summary, statistics, root_causes, action_plan, generated_at)
-		 VALUES ($1,$2,$3,$4,$5,now())
+		`INSERT INTO audit_insights (
+			audit_id, executive_summary, statistics, root_causes, action_plan,
+			category_insights, feature_suggestions, bug_suggestions, featured_reviews, generated_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now())
 		 ON CONFLICT (audit_id) DO UPDATE SET
 		   executive_summary = EXCLUDED.executive_summary,
 		   statistics = EXCLUDED.statistics,
 		   root_causes = EXCLUDED.root_causes,
 		   action_plan = EXCLUDED.action_plan,
+		   category_insights = EXCLUDED.category_insights,
+		   feature_suggestions = EXCLUDED.feature_suggestions,
+		   bug_suggestions = EXCLUDED.bug_suggestions,
+		   featured_reviews = EXCLUDED.featured_reviews,
 		   generated_at = now()`,
 		auditUUID, insights.ExecutiveSummary, statsJSON, rootJSON, planJSON,
+		catJSON, featJSON, bugJSON, featRevJSON,
 	)
 	return err
 }
@@ -397,11 +455,13 @@ func (r *Repository) GetInsights(ctx context.Context, auditID string) (*auditMod
 		return nil, err
 	}
 	var ins auditModel.Insights
-	var statsJSON, rootJSON, planJSON []byte
+	var statsJSON, rootJSON, planJSON, catJSON, featJSON, bugJSON, featRevJSON []byte
 	err = r.db.QueryRow(ctx,
-		`SELECT audit_id, executive_summary, statistics, root_causes, action_plan, generated_at
+		`SELECT audit_id, executive_summary, statistics, root_causes, action_plan,
+		        category_insights, feature_suggestions, bug_suggestions, featured_reviews, generated_at
 		 FROM audit_insights WHERE audit_id = $1`, auditUUID,
-	).Scan(&auditUUID, &ins.ExecutiveSummary, &statsJSON, &rootJSON, &planJSON, &ins.GeneratedAt)
+	).Scan(&auditUUID, &ins.ExecutiveSummary, &statsJSON, &rootJSON, &planJSON,
+		&catJSON, &featJSON, &bugJSON, &featRevJSON, &ins.GeneratedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -412,6 +472,10 @@ func (r *Repository) GetInsights(ctx context.Context, auditID string) (*auditMod
 	_ = json.Unmarshal(statsJSON, &ins.Statistics)
 	_ = json.Unmarshal(rootJSON, &ins.RootCauses)
 	_ = json.Unmarshal(planJSON, &ins.ActionPlan)
+	_ = json.Unmarshal(catJSON, &ins.CategoryInsights)
+	_ = json.Unmarshal(featJSON, &ins.FeatureSuggestions)
+	_ = json.Unmarshal(bugJSON, &ins.BugSuggestions)
+	_ = json.Unmarshal(featRevJSON, &ins.FeaturedReviews)
 	return &ins, nil
 }
 
