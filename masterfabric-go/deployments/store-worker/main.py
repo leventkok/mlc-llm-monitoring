@@ -7,10 +7,10 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
-from google_play_scraper import Sort, app, reviews, search
+from google_play_scraper import Sort, reviews, search
 from pydantic import BaseModel, Field
 
-app_fast = FastAPI(title="InferReview Store Worker", version="1.0")
+app = FastAPI(title="InferReview Store Worker", version="1.0")
 
 DEFAULT_LANG = os.environ.get("STORE_DEFAULT_LANG", "tr")
 DEFAULT_COUNTRY = os.environ.get("STORE_DEFAULT_COUNTRY", "tr")
@@ -26,12 +26,12 @@ def _iso(dt: Any) -> str | None:
     return str(dt)
 
 
-@app_fast.get("/health")
+@app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app_fast.get("/search")
+@app.get("/search")
 def search_apps(
     store: str = Query(..., pattern="^(play|appstore)$"),
     q: str = Query(..., min_length=1),
@@ -183,7 +183,7 @@ class CrawlRequest(BaseModel):
     country: str = DEFAULT_COUNTRY
 
 
-@app_fast.post("/crawl")
+@app.post("/crawl")
 def crawl(req: CrawlRequest) -> dict[str, Any]:
     app_name = req.app_name.strip()
     if not app_name:
