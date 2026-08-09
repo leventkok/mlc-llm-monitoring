@@ -35,9 +35,13 @@ import (
 	infraHFDataset "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/hfdataset"
 	infraMLC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/mlc"
 	orgUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/org/usecase"
+	auditUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/audit/usecase"
 	inviteHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/invite"
 	orgHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/org"
 	orgadminHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/orgadmin"
+	auditHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/audit"
+	pgAudit "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/audit"
+	infraStore "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/store"
 	pgOrg "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/org"
 	pgConfig "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/config"
 	pgIam "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/postgres/iam"
@@ -219,6 +223,13 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 	deepWikiClient := infraDeepWiki.NewClient(os.Getenv("DEEPWIKI_MCP_URL"))
 	mcpHTTPHandler := mcpHandler.NewHandler(reviewScope, analyzeReviewUC, deepWikiClient, batchDatasetUC)
 
+	auditRepo := pgAudit.NewRepository(db)
+	storeClient := infraStore.NewClient(os.Getenv("STORE_WORKER_URL"))
+	var auditSvc *auditUC.Service
+	if storeClient.Available() {
+		auditSvc = auditUC.NewService(auditRepo, storeClient, reviewScope, mlcClient)
+	}
+
 	getConfigUC := configUC.NewGetConfigUseCase(configRepo)
 	updateConfigUC := configUC.NewUpdateConfigUseCase(configRepo)
 	getLLMConfigUC := configUC.NewGetLLMConfigUseCase(configRepo)
@@ -228,7 +239,7 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 	switchStatusUC := configUC.NewGetModelSwitchStatusUseCase(switchRepo)
 	agentSwitchUC := configUC.NewAgentModelSwitchUseCase(switchRepo)
 
-	return router.Dependencies{
+	deps := router.Dependencies{
 		Logger:             log,
 		DB:                 db,
 		CORSAllowedOrigins: cfg.Server.CORSAllowedOrigins,
@@ -254,8 +265,12 @@ func buildDependencies(log *slog.Logger, cfg *config.Config, db *pgxpool.Pool, a
 		OrgAdminHandler: orgadminHandler.NewHandler(orgService),
 		OrgHandler:      orgHandler.NewHandler(orgService),
 		InviteHandler:   inviteHandler.NewHandler(orgService),
-		AgentHandler:  agentHandler.NewHandler(agentSwitchUC),
-		MLCAPIKey:     cfg.MLC.APIKey,
-		MCPHandler:    mcpHTTPHandler,
+		AgentHandler:    agentHandler.NewHandler(agentSwitchUC),
+		MLCAPIKey:       cfg.MLC.APIKey,
+		MCPHandler:      mcpHTTPHandler,
 	}
+	if auditSvc != nil {
+		deps.AuditHandler = auditHandler.NewHandler(auditSvc)
+	}
+	return deps
 }

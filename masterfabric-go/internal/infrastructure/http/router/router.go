@@ -18,6 +18,7 @@ import (
 	inviteHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/invite"
 	orgHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/org"
 	orgadminHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/orgadmin"
+	auditHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/audit"
 	iamHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/iam"
 	llmHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/llm"
 	mcpHandler "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/infrastructure/http/handler/mcp"
@@ -44,6 +45,7 @@ type Dependencies struct {
 	OrgAdminHandler *orgadminHandler.Handler
 	OrgHandler      *orgHandler.Handler
 	InviteHandler *inviteHandler.Handler
+	AuditHandler  *auditHandler.Handler
 	AgentHandler  *agentHandler.Handler
 	MLCAPIKey     string
 	MCPHandler    *mcpHandler.Handler
@@ -138,6 +140,17 @@ func New(deps Dependencies) http.Handler {
 			r.Delete("/organization/members/{userId}", deps.OrgHandler.RemoveMember)
 			r.Get("/organization/invites", deps.OrgHandler.ListInvites)
 			r.Post("/organization/invites", deps.OrgHandler.CreateInvite)
+		})
+	}
+
+	if deps.AuditHandler != nil {
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.LegacyAuth(deps.AppJWT))
+			r.Post("/audits/search", deps.AuditHandler.Search)
+			r.Get("/audits", deps.AuditHandler.List)
+			r.Post("/audits", deps.AuditHandler.Create)
+			r.Get("/audits/{id}", deps.AuditHandler.Get)
+			r.Get("/audits/{id}/report", deps.AuditHandler.Report)
 		})
 	}
 

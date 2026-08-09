@@ -1,57 +1,104 @@
 package audit
 
 import (
+	"encoding/json"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
-	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/domain/audit/repository"
-	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/pagination"
+	auditDTO "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/audit/dto"
+	auditUC "github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/application/audit/usecase"
+	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/middleware"
 	"github.com/leventkok/mlc-llm-monitoring/masterfabric-go/internal/shared/response"
+
+	"github.com/go-chi/chi/v5"
 )
 
-// Handler provides Audit HTTP handlers.
 type Handler struct {
-	auditRepo repository.AuditRepository
+	svc *auditUC.Service
 }
 
-// NewHandler creates a new Audit handler.
-func NewHandler(auditRepo repository.AuditRepository) *Handler {
-	return &Handler{auditRepo: auditRepo}
+func NewHandler(svc *auditUC.Service) *Handler {
+	return &Handler{svc: svc}
 }
 
-// ListByOrg returns audit logs for an organization.
-func (h *Handler) ListByOrg(w http.ResponseWriter, r *http.Request) {
-	orgID, err := uuid.Parse(chi.URLParam(r, "orgId"))
-	if err != nil {
-		response.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid org id"})
+func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
+	var req auditDTO.SearchAppsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.LegacyError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-
-	params := pagination.FromRequest(r)
-	logs, total, err := h.auditRepo.ListByOrg(r.Context(), orgID, params.Offset(), params.Limit())
+	out, err := h.svc.SearchApps(r.Context(), req.Query)
 	if err != nil {
-		response.Error(w, err)
+		response.LegacyError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-
-	response.JSON(w, http.StatusOK, pagination.NewResult(logs, params, total))
+	response.LegacyJSON(w, http.StatusOK, out)
 }
 
-// ListByUser returns audit logs for a user.
-func (h *Handler) ListByUser(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(chi.URLParam(r, "userId"))
-	if err != nil {
-		response.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.LegacyUserID(r.Context())
+	if !ok {
+		response.LegacyError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-
-	params := pagination.FromRequest(r)
-	logs, total, err := h.auditRepo.ListByUser(r.Context(), userID, params.Offset(), params.Limit())
-	if err != nil {
-		response.Error(w, err)
+	var req auditDTO.CreateAuditRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.LegacyError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
+	out, err := h.svc.CreateAudit(r.Context(), userID, req)
+	if err != nil {
+		response.LegacyError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	response.LegacyJSON(w, http.StatusCreated, out)
+}
 
-	response.JSON(w, http.StatusOK, pagination.NewResult(logs, params, total))
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.LegacyUserID(r.Context())
+	if !ok {
+		response.LegacyError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	out, err := h.svc.ListAudits(r.Context(), userID)
+	if err != nil {
+		response.LegacyError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	response.LegacyJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.LegacyUserID(r.Context())
+	if !ok {
+		response.LegacyError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	out, err := h.svc.GetAudit(r.Context(), userID, chi.URLParam(r, "id"))
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "audit not found" {
+			status = http.StatusNotFound
+		}
+		response.LegacyError(w, status, err.Error())
+		return
+	}
+	response.LegacyJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.LegacyUserID(r.Context())
+	if !ok {
+		response.LegacyError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	out, err := h.svc.GetReport(r.Context(), userID, chi.URLParam(r, "id"))
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "audit not found" {
+			status = http.StatusNotFound
+		}
+		response.LegacyError(w, status, err.Error())
+		return
+	}
+	response.LegacyJSON(w, http.StatusOK, out)
 }

@@ -17,6 +17,9 @@ import {
   OrgMember,
   InvitePreview,
   OrganizationMembership,
+  StoreApp,
+  Audit,
+  AuditReport,
 } from "../types";
 
 const PRODUCTION_API_URL = "https://mlc-llm-monitoring.onrender.com";
@@ -275,4 +278,30 @@ export const orgApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+};
+
+export const auditApi = {
+  search: (query: string) =>
+    request<{ play: StoreApp[]; appstore: StoreApp[] }>("/audits/search", {
+      method: "POST",
+      body: JSON.stringify({ query }),
+    }),
+
+  list: () => request<Audit[]>("/audits"),
+
+  create: (data: {
+    client_name: string;
+    app_display_name: string;
+    play_app_id?: string;
+    appstore_app_id?: string;
+    mode: "quick" | "full";
+  }) =>
+    request<Audit>("/audits", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  get: (id: string) => request<Audit>(`/audits/${id}`),
+
+  report: (id: string) => request<AuditReport>(`/audits/${id}/report`),
 };

@@ -100,6 +100,18 @@ services:
     ports:
       - "${DATASET_WORKER_HOST_BIND:-127.0.0.1}:${DATASET_WORKER_PORT:-8090}:8090"
 
+  store-worker:
+    build:
+      context: ./store-worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      STORE_DEFAULT_LANG: ${STORE_DEFAULT_LANG:-tr}
+      STORE_DEFAULT_COUNTRY: ${STORE_DEFAULT_COUNTRY:-tr}
+      PORT: "8091"
+    ports:
+      - "${STORE_WORKER_HOST_BIND:-127.0.0.1}:${STORE_WORKER_PORT:-8091}:8091"
+
 volumes:
   mlc_models:
   mlc_jit_cache:

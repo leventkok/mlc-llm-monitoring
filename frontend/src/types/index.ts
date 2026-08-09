@@ -184,3 +184,44 @@ export interface BatchAnalyzeResult {
   accuracy_pct: number;
   items: BatchAnalyzeItem[];
 }
+
+export interface StoreApp {
+  store: string;
+  app_id: string;
+  app_name: string;
+  developer: string;
+  icon_url?: string;
+}
+
+export interface Audit {
+  id: string;
+  client_name: string;
+  app_display_name: string;
+  play_app_id?: string;
+  appstore_app_id?: string;
+  mode: string;
+  status: string;
+  step: string;
+  play_fetched: number;
+  appstore_fetched: number;
+  total_reviews: number;
+  analyzed_count: number;
+  truncated: boolean;
+  error_message?: string;
+  started_at?: string;
+  completed_at?: string;
+  created_at: string;
+}
+
+export interface AuditInsights {
+  executive_summary: string;
+  statistics: Record<string, unknown>;
+  root_causes: Array<Record<string, unknown>>;
+  action_plan: Array<Record<string, unknown>>;
+  generated_at: string;
+}
+
+export interface AuditReport {
+  audit: Audit;
+  insights?: AuditInsights;
+}

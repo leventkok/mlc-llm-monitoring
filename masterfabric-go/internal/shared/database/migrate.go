@@ -103,6 +103,53 @@ var legacyMigrations = []string{
 	`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL`,
 	`CREATE INDEX IF NOT EXISTS reviews_org_id_idx ON reviews (org_id)`,
 	`CREATE INDEX IF NOT EXISTS reviews_user_org_idx ON reviews (user_id, org_id)`,
+	`CREATE TABLE IF NOT EXISTS app_audits (
+	    id               UUID PRIMARY KEY,
+	    user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	    org_id           UUID REFERENCES organizations(id) ON DELETE SET NULL,
+	    client_name      TEXT NOT NULL,
+	    app_display_name TEXT NOT NULL,
+	    play_app_id      TEXT,
+	    appstore_app_id  TEXT,
+	    mode             TEXT NOT NULL DEFAULT 'quick',
+	    status           TEXT NOT NULL DEFAULT 'queued',
+	    step             TEXT NOT NULL DEFAULT 'crawl',
+	    play_fetched     INT NOT NULL DEFAULT 0,
+	    appstore_fetched INT NOT NULL DEFAULT 0,
+	    total_reviews    INT NOT NULL DEFAULT 0,
+	    analyzed_count   INT NOT NULL DEFAULT 0,
+	    truncated        BOOLEAN NOT NULL DEFAULT FALSE,
+	    error_message    TEXT,
+	    started_at       TIMESTAMPTZ,
+	    completed_at     TIMESTAMPTZ,
+	    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+	)`,
+	`CREATE INDEX IF NOT EXISTS app_audits_user_id_idx ON app_audits (user_id, created_at DESC)`,
+	`CREATE INDEX IF NOT EXISTS app_audits_org_id_idx ON app_audits (org_id, created_at DESC)`,
+	`CREATE TABLE IF NOT EXISTS audit_reviews (
+	    id              UUID PRIMARY KEY,
+	    audit_id        UUID NOT NULL REFERENCES app_audits(id) ON DELETE CASCADE,
+	    store           TEXT NOT NULL,
+	    store_review_id TEXT NOT NULL,
+	    app_name        TEXT NOT NULL,
+	    rating          INT NOT NULL,
+	    text            TEXT NOT NULL,
+	    reviewed_at     TIMESTAMPTZ,
+	    category        TEXT,
+	    sentiment       TEXT,
+	    raw_output      TEXT,
+	    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+	    UNIQUE (audit_id, store, store_review_id)
+	)`,
+	`CREATE INDEX IF NOT EXISTS audit_reviews_audit_id_idx ON audit_reviews (audit_id)`,
+	`CREATE TABLE IF NOT EXISTS audit_insights (
+	    audit_id           UUID PRIMARY KEY REFERENCES app_audits(id) ON DELETE CASCADE,
+	    executive_summary  TEXT,
+	    statistics         JSONB,
+	    root_causes        JSONB,
+	    action_plan        JSONB,
+	    generated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+	)`,
 }
 
 // MigrateAppSchema applies the app review monitoring schema on startup.

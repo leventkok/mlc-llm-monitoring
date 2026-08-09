@@ -24,3 +24,27 @@ services:
         sync: false
       - key: METRICS_ENABLED
         value: "true"
+      - key: STORE_WORKER_URL
+        sync: false
+      - key: AUDIT_MAX_REVIEWS
+        value: "10000"
+      - key: AUDIT_QUICK_REVIEW_CAP
+        value: "500"
+      - key: AUDIT_BATCH_SIZE
+        value: "8"
+      - key: AUDIT_CLASSIFY_WORKERS
+        value: "4"
+
+  - type: web
+    name: inferreview-store-worker
+    runtime: python
+    plan: free
+    branch: main
+    rootDir: masterfabric-go/deployments/store-worker
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: STORE_DEFAULT_LANG
+        value: tr
+      - key: STORE_DEFAULT_COUNTRY
+        value: tr
