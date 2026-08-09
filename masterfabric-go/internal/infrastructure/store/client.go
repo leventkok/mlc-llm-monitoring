@@ -27,7 +27,7 @@ func NewClient(baseURL string) *Client {
 	return &Client{
 		baseURL: baseURL,
 		httpClient: &http.Client{
-			Timeout: 180 * time.Second,
+			Timeout: 600 * time.Second,
 		},
 	}
 }
@@ -65,16 +65,28 @@ type CrawlResult struct {
 	Reviews         []ReviewRow `json:"reviews"`
 }
 
-type crawlRequest struct {
-	AppName        string `json:"app_name"`
-	PlayAppID      string `json:"play_app_id"`
-	AppStoreAppID  string `json:"appstore_app_id"`
-	Limit          int    `json:"limit"`
-	Lang           string `json:"lang"`
-	Country        string `json:"country"`
+type CrawlOptions struct {
+	AppName             string
+	PlayAppID           string
+	AppStoreAppID       string
+	PlayReviewLimit     int
+	AppStoreReviewLimit int
+	Lang                string
+	Country             string
 }
 
-func (c *Client) Search(ctx context.Context, store, query string, limit int) ([]AppResult, error) {
+type crawlRequest struct {
+	AppName         string `json:"app_name"`
+	PlayAppID       string `json:"play_app_id"`
+	AppStoreAppID   string `json:"appstore_app_id"`
+	Limit           int    `json:"limit"`
+	PlayLimit       *int   `json:"play_limit,omitempty"`
+	AppStoreLimit   *int   `json:"appstore_limit,omitempty"`
+	Lang            string `json:"lang"`
+	Country         string `json:"country"`
+}
+
+func (c *Client) Search(ctx context.Context, store, query, country, lang string, limit int) ([]AppResult, error) {
 	u, err := url.Parse(c.baseURL + "/search")
 	if err != nil {
 		return nil, err
@@ -83,6 +95,12 @@ func (c *Client) Search(ctx context.Context, store, query string, limit int) ([]
 	q.Set("store", store)
 	q.Set("q", query)
 	q.Set("limit", fmt.Sprintf("%d", limit))
+	if strings.TrimSpace(country) != "" {
+		q.Set("country", strings.TrimSpace(country))
+	}
+	if strings.TrimSpace(lang) != "" {
+		q.Set("lang", strings.TrimSpace(lang))
+	}
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
@@ -133,13 +151,44 @@ func (c *Client) Crawl(ctx context.Context, req crawlRequest) (CrawlResult, erro
 	return result, nil
 }
 
-func (c *Client) CrawlApps(ctx context.Context, appName, playAppID, appStoreAppID string, limit int) (CrawlResult, error) {
-	return c.Crawl(ctx, crawlRequest{
-		AppName:       appName,
-		PlayAppID:     playAppID,
-		AppStoreAppID: appStoreAppID,
-		Limit:         limit,
-		Lang:          "tr",
-		Country:       "tr",
-	})
+func (c *Client) CrawlApps(ctx context.Context, opts CrawlOptions) (CrawlResult, error) {
+	lang := strings.TrimSpace(opts.Lang)
+	if lang == "" {
+		lang = "tr"
+	}
+	country := strings.TrimSpace(opts.Country)
+	if country == "" {
+		country = "tr"
+	}
+
+	playLimit := opts.PlayReviewLimit
+	appStoreLimit := opts.AppStoreReviewLimit
+	totalLimit := 0
+	if opts.PlayAppID != "" {
+		totalLimit += playLimit
+	}
+	if opts.AppStoreAppID != "" {
+		totalLimit += appStoreLimit
+	}
+	if totalLimit <= 0 {
+		totalLimit = 500
+	}
+
+	req := crawlRequest{
+		AppName:       opts.AppName,
+		PlayAppID:     opts.PlayAppID,
+		AppStoreAppID: opts.AppStoreAppID,
+		Limit:         totalLimit,
+		Lang:          lang,
+		Country:       country,
+	}
+	if opts.PlayAppID != "" && playLimit > 0 {
+		pl := playLimit
+		req.PlayLimit = &pl
+	}
+	if opts.AppStoreAppID != "" && appStoreLimit > 0 {
+		al := appStoreLimit
+		req.AppStoreLimit = &al
+	}
+	return c.Crawl(ctx, req)
 }

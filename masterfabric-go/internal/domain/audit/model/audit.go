@@ -25,6 +25,10 @@ type Audit struct {
 	AppDisplayName  string
 	PlayAppID       string
 	AppStoreAppID   string
+	Country         string
+	Lang            string
+	PlayReviewLimit int
+	AppStoreReviewLimit int
 	Mode            string
 	Status          string
 	Step            string

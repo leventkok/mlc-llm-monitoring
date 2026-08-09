@@ -65,6 +65,10 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     );
   }
 
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
   let data: { error?: string };
   try {
     data = await res.json();
@@ -281,10 +285,10 @@ export const orgApi = {
 };
 
 export const auditApi = {
-  search: (query: string) =>
+  search: (query: string, country?: string) =>
     request<{ play: StoreApp[]; appstore: StoreApp[] }>("/audits/search", {
       method: "POST",
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, country: country || "tr" }),
     }),
 
   list: () => request<Audit[]>("/audits"),
@@ -294,6 +298,9 @@ export const auditApi = {
     app_display_name: string;
     play_app_id?: string;
     appstore_app_id?: string;
+    country?: string;
+    play_review_limit?: number;
+    appstore_review_limit?: number;
     mode: "quick" | "full";
   }) =>
     request<Audit>("/audits", {
@@ -304,4 +311,9 @@ export const auditApi = {
   get: (id: string) => request<Audit>(`/audits/${id}`),
 
   report: (id: string) => request<AuditReport>(`/audits/${id}/report`),
+
+  remove: (id: string) =>
+    request<void>(`/audits/${id}`, {
+      method: "DELETE",
+    }),
 };

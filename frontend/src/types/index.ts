@@ -199,6 +199,10 @@ export interface Audit {
   app_display_name: string;
   play_app_id?: string;
   appstore_app_id?: string;
+  country?: string;
+  lang?: string;
+  play_review_limit?: number;
+  appstore_review_limit?: number;
   mode: string;
   status: string;
   step: string;

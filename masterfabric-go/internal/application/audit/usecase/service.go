@@ -35,7 +35,7 @@ func NewService(repo *pgAudit.Repository, store *infraStore.Client, scope *llmSc
 	return &Service{repo: repo, store: store, scope: scope, mlc: mlc}
 }
 
-func (s *Service) SearchApps(ctx context.Context, query string) (auditDTO.SearchAppsResponse, error) {
+func (s *Service) SearchApps(ctx context.Context, query, country, lang string) (auditDTO.SearchAppsResponse, error) {
 	if s.store == nil || !s.store.Available() {
 		return auditDTO.SearchAppsResponse{}, errors.New("store worker is not configured")
 	}
@@ -43,11 +43,13 @@ func (s *Service) SearchApps(ctx context.Context, query string) (auditDTO.Search
 	if query == "" {
 		return auditDTO.SearchAppsResponse{}, errors.New("query is required")
 	}
-	play, err := s.store.Search(ctx, "play", query, 8)
+	country = normalizeCountry(country)
+	lang = normalizeLang(lang)
+	play, err := s.store.Search(ctx, "play", query, country, lang, 8)
 	if err != nil {
 		return auditDTO.SearchAppsResponse{}, err
 	}
-	appstore, err := s.store.Search(ctx, "appstore", query, 8)
+	appstore, err := s.store.Search(ctx, "appstore", query, country, lang, 8)
 	if err != nil {
 		return auditDTO.SearchAppsResponse{}, err
 	}
@@ -82,14 +84,27 @@ func (s *Service) CreateAudit(ctx context.Context, userID string, req auditDTO.C
 		}
 	}
 
+	playLimit := 0
+	if strings.TrimSpace(req.PlayAppID) != "" {
+		playLimit = resolveReviewLimit(mode, req.PlayReviewLimit)
+	}
+	appStoreLimit := 0
+	if strings.TrimSpace(req.AppStoreAppID) != "" {
+		appStoreLimit = resolveReviewLimit(mode, req.AppStoreReviewLimit)
+	}
+
 	audit, err := s.repo.Create(ctx, auditModel.Audit{
-		UserID:         userID,
-		OrgID:          orgID,
-		ClientName:     strings.TrimSpace(req.ClientName),
-		AppDisplayName: strings.TrimSpace(req.AppDisplayName),
-		PlayAppID:      strings.TrimSpace(req.PlayAppID),
-		AppStoreAppID:  strings.TrimSpace(req.AppStoreAppID),
-		Mode:           mode,
+		UserID:              userID,
+		OrgID:               orgID,
+		ClientName:          strings.TrimSpace(req.ClientName),
+		AppDisplayName:      strings.TrimSpace(req.AppDisplayName),
+		PlayAppID:           strings.TrimSpace(req.PlayAppID),
+		AppStoreAppID:       strings.TrimSpace(req.AppStoreAppID),
+		Country:             normalizeCountry(req.Country),
+		Lang:                normalizeLang(req.Lang),
+		PlayReviewLimit:     playLimit,
+		AppStoreReviewLimit: appStoreLimit,
+		Mode:                mode,
 	})
 	if err != nil {
 		return auditDTO.AuditResponse{}, errors.New("could not create audit")
@@ -123,6 +138,17 @@ func (s *Service) ListAudits(ctx context.Context, userID string) ([]auditDTO.Aud
 		out = append(out, toAuditResponse(a))
 	}
 	return out, nil
+}
+
+func (s *Service) DeleteAudit(ctx context.Context, userID, auditID string) error {
+	orgID := s.orgID(ctx, userID)
+	if err := s.repo.Delete(ctx, auditID, userID, orgID); err != nil {
+		if errors.Is(err, pgAudit.ErrNotFound) {
+			return errors.New("audit not found")
+		}
+		return errors.New("could not delete audit")
+	}
+	return nil
 }
 
 func (s *Service) GetReport(ctx context.Context, userID, auditID string) (auditDTO.ReportResponse, error) {
@@ -193,7 +219,23 @@ func (s *Service) runAudit(auditID, userID, orgID string) {
 	}
 
 	limit := reviewLimit(a.Mode)
-	crawl, err := s.store.CrawlApps(ctx, a.AppDisplayName, a.PlayAppID, a.AppStoreAppID, limit)
+	playLimit := a.PlayReviewLimit
+	if playLimit <= 0 {
+		playLimit = limit
+	}
+	appStoreLimit := a.AppStoreReviewLimit
+	if appStoreLimit <= 0 {
+		appStoreLimit = limit
+	}
+	crawl, err := s.store.CrawlApps(ctx, infraStore.CrawlOptions{
+		AppName:             a.AppDisplayName,
+		PlayAppID:           a.PlayAppID,
+		AppStoreAppID:       a.AppStoreAppID,
+		PlayReviewLimit:     playLimit,
+		AppStoreReviewLimit: appStoreLimit,
+		Lang:                a.Lang,
+		Country:             a.Country,
+	})
 	if err != nil {
 		fail(err.Error())
 		return
@@ -472,7 +514,10 @@ func mapApps(in []infraStore.AppResult) []auditDTO.StoreApp {
 func toAuditResponse(a auditModel.Audit) auditDTO.AuditResponse {
 	resp := auditDTO.AuditResponse{
 		ID: a.ID, ClientName: a.ClientName, AppDisplayName: a.AppDisplayName,
-		PlayAppID: a.PlayAppID, AppStoreAppID: a.AppStoreAppID, Mode: a.Mode,
+		PlayAppID: a.PlayAppID, AppStoreAppID: a.AppStoreAppID,
+		Country: a.Country, Lang: a.Lang,
+		PlayReviewLimit: a.PlayReviewLimit, AppStoreReviewLimit: a.AppStoreReviewLimit,
+		Mode: a.Mode,
 		Status: a.Status, Step: a.Step, PlayFetched: a.PlayFetched, AppStoreFetched: a.AppStoreFetched,
 		TotalReviews: a.TotalReviews, AnalyzedCount: a.AnalyzedCount, Truncated: a.Truncated,
 		ErrorMessage: a.ErrorMessage, CreatedAt: a.CreatedAt.UTC().Format(time.RFC3339),
@@ -498,6 +543,29 @@ func reviewLimit(mode string) int {
 		return envInt("AUDIT_MAX_REVIEWS", 10000)
 	}
 	return envInt("AUDIT_QUICK_REVIEW_CAP", 500)
+}
+
+func resolveReviewLimit(mode string, requested int) int {
+	if requested > 0 {
+		return requested
+	}
+	return reviewLimit(mode)
+}
+
+func normalizeCountry(country string) string {
+	country = strings.ToLower(strings.TrimSpace(country))
+	if country == "" {
+		return "tr"
+	}
+	return country
+}
+
+func normalizeLang(lang string) string {
+	lang = strings.ToLower(strings.TrimSpace(lang))
+	if lang == "" {
+		return "tr"
+	}
+	return lang
 }
 
 func envInt(key string, fallback int) int {

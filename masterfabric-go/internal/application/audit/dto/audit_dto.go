@@ -9,7 +9,9 @@ type StoreApp struct {
 }
 
 type SearchAppsRequest struct {
-	Query string `json:"query"`
+	Query   string `json:"query"`
+	Country string `json:"country,omitempty"`
+	Lang    string `json:"lang,omitempty"`
 }
 
 type SearchAppsResponse struct {
@@ -18,20 +20,28 @@ type SearchAppsResponse struct {
 }
 
 type CreateAuditRequest struct {
-	ClientName     string `json:"client_name"`
-	AppDisplayName string `json:"app_display_name"`
-	PlayAppID      string `json:"play_app_id"`
-	AppStoreAppID  string `json:"appstore_app_id"`
-	Mode           string `json:"mode"`
+	ClientName          string `json:"client_name"`
+	AppDisplayName      string `json:"app_display_name"`
+	PlayAppID           string `json:"play_app_id"`
+	AppStoreAppID       string `json:"appstore_app_id"`
+	Country             string `json:"country,omitempty"`
+	Lang                string `json:"lang,omitempty"`
+	PlayReviewLimit     int    `json:"play_review_limit,omitempty"`
+	AppStoreReviewLimit int    `json:"appstore_review_limit,omitempty"`
+	Mode                string `json:"mode"`
 }
 
 type AuditResponse struct {
 	ID              string `json:"id"`
 	ClientName      string `json:"client_name"`
 	AppDisplayName  string `json:"app_display_name"`
-	PlayAppID       string `json:"play_app_id,omitempty"`
-	AppStoreAppID   string `json:"appstore_app_id,omitempty"`
-	Mode            string `json:"mode"`
+	PlayAppID           string `json:"play_app_id,omitempty"`
+	AppStoreAppID       string `json:"appstore_app_id,omitempty"`
+	Country             string `json:"country,omitempty"`
+	Lang                string `json:"lang,omitempty"`
+	PlayReviewLimit     int    `json:"play_review_limit,omitempty"`
+	AppStoreReviewLimit int    `json:"appstore_review_limit,omitempty"`
+	Mode                string `json:"mode"`
 	Status          string `json:"status"`
 	Step            string `json:"step"`
 	PlayFetched     int    `json:"play_fetched"`

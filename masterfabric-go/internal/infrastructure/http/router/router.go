@@ -151,6 +151,7 @@ func New(deps Dependencies) http.Handler {
 			r.Post("/audits", deps.AuditHandler.Create)
 			r.Get("/audits/{id}", deps.AuditHandler.Get)
 			r.Get("/audits/{id}/report", deps.AuditHandler.Report)
+			r.Delete("/audits/{id}", deps.AuditHandler.Delete)
 		})
 	}
 

@@ -36,10 +36,14 @@ def search_apps(
     store: str = Query(..., pattern="^(play|appstore)$"),
     q: str = Query(..., min_length=1),
     limit: int = Query(8, ge=1, le=20),
+    country: str = Query(DEFAULT_COUNTRY),
+    lang: str = Query(DEFAULT_LANG),
 ) -> dict[str, Any]:
     q = q.strip()
+    country = (country or DEFAULT_COUNTRY).strip().lower()
+    lang = (lang or DEFAULT_LANG).strip().lower()
     if store == "play":
-        hits = search(q, lang=DEFAULT_LANG, country=DEFAULT_COUNTRY, n_hits=limit)
+        hits = search(q, lang=lang, country=country, n_hits=limit)
         apps = []
         for h in hits:
             apps.append(
@@ -59,7 +63,7 @@ def search_apps(
             params={
                 "term": q,
                 "entity": "software",
-                "country": DEFAULT_COUNTRY,
+                "country": country,
                 "limit": limit,
             },
         )
@@ -124,7 +128,7 @@ def _fetch_appstore(app_id: str, app_name: str, limit: int, country: str) -> lis
     out: list[dict[str, Any]] = []
     page = 1
     with httpx.Client(timeout=30.0) as client:
-        while len(out) < limit and page <= 10:
+        while len(out) < limit and page <= 50:
             url = (
                 f"https://itunes.apple.com/{country}/rss/customerreviews/"
                 f"page={page}/id={app_id}/sortby=mostrecent/json"
@@ -178,6 +182,8 @@ class CrawlRequest(BaseModel):
     play_app_id: str = ""
     appstore_app_id: str = ""
     limit: int = Field(500, ge=1, le=10000)
+    play_limit: int | None = None
+    appstore_limit: int | None = None
     per_store_limit: int | None = None
     lang: str = DEFAULT_LANG
     country: str = DEFAULT_COUNTRY
@@ -192,20 +198,22 @@ def crawl(req: CrawlRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="at least one store app id required")
 
     stores = sum(1 for x in (req.play_app_id, req.appstore_app_id) if x)
-    per_store = req.per_store_limit or max(1, req.limit // stores)
+    fallback_per_store = max(1, req.limit // stores) if stores else req.limit
+    play_cap = req.play_limit if req.play_limit is not None else (req.per_store_limit or fallback_per_store)
+    appstore_cap = req.appstore_limit if req.appstore_limit is not None else (req.per_store_limit or fallback_per_store)
 
     play_rows: list[dict[str, Any]] = []
     appstore_rows: list[dict[str, Any]] = []
 
     if req.play_app_id:
         try:
-            play_rows = _fetch_play(req.play_app_id, app_name, per_store, req.lang, req.country)
+            play_rows = _fetch_play(req.play_app_id, app_name, play_cap, req.lang, req.country)
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=502, detail=f"play crawl failed: {exc}") from exc
 
     if req.appstore_app_id:
         try:
-            appstore_rows = _fetch_appstore(req.appstore_app_id, app_name, per_store, req.country)
+            appstore_rows = _fetch_appstore(req.appstore_app_id, app_name, appstore_cap, req.country)
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=502, detail=f"appstore crawl failed: {exc}") from exc
 

@@ -41,7 +41,7 @@ export default function ReportDetailPage() {
 
   return (
     <ProtectedRoute>
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-6xl px-6 py-10">
         {!audit && !error && <p className="text-muted">Loading audit…</p>}
         {error && <p className="text-red-500">{error}</p>}
 

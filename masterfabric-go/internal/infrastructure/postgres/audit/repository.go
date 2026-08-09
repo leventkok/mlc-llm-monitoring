@@ -39,11 +39,14 @@ func (r *Repository) Create(ctx context.Context, a auditModel.Audit) (auditModel
 	err = r.db.QueryRow(ctx,
 		`INSERT INTO app_audits (
 			id, user_id, org_id, client_name, app_display_name,
-			play_app_id, appstore_app_id, mode, status, step, created_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()) RETURNING created_at`,
+			play_app_id, appstore_app_id, country, lang,
+			play_review_limit, appstore_review_limit,
+			mode, status, step, created_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,now()) RETURNING created_at`,
 		id, userUUID, orgUUID, a.ClientName, a.AppDisplayName,
-		nullStr(a.PlayAppID), nullStr(a.AppStoreAppID), a.Mode,
-		auditModel.StatusQueued, auditModel.StepCrawl,
+		nullStr(a.PlayAppID), nullStr(a.AppStoreAppID), a.Country, a.Lang,
+		a.PlayReviewLimit, a.AppStoreReviewLimit,
+		a.Mode, auditModel.StatusQueued, auditModel.StepCrawl,
 	).Scan(&created)
 	if err != nil {
 		return auditModel.Audit{}, err
@@ -67,11 +70,13 @@ func (r *Repository) Get(ctx context.Context, id, userID, orgID string) (auditMo
 	var started, completed *time.Time
 	err = r.db.QueryRow(ctx,
 		`SELECT id, user_id, org_id, client_name, app_display_name, play_app_id, appstore_app_id,
+		        country, lang, play_review_limit, appstore_review_limit,
 		        mode, status, step, play_fetched, appstore_fetched, total_reviews, analyzed_count,
 		        truncated, error_message, started_at, completed_at, created_at
 		 FROM app_audits WHERE id = $1`, auditUUID,
 	).Scan(
 		&auditUUID, &uid, &orgUUID, &a.ClientName, &a.AppDisplayName, &playID, &appstoreID,
+		&a.Country, &a.Lang, &a.PlayReviewLimit, &a.AppStoreReviewLimit,
 		&a.Mode, &a.Status, &a.Step, &a.PlayFetched, &a.AppStoreFetched, &a.TotalReviews,
 		&a.AnalyzedCount, &a.Truncated, &errMsg, &started, &completed, &a.CreatedAt,
 	)
@@ -119,6 +124,7 @@ func (r *Repository) List(ctx context.Context, userID, orgID string, limit int) 
 		}
 		rows, err = r.db.Query(ctx,
 			`SELECT id, user_id, org_id, client_name, app_display_name, play_app_id, appstore_app_id,
+			        country, lang, play_review_limit, appstore_review_limit,
 			        mode, status, step, play_fetched, appstore_fetched, total_reviews, analyzed_count,
 			        truncated, error_message, started_at, completed_at, created_at
 			 FROM app_audits WHERE org_id = $1 ORDER BY created_at DESC LIMIT $2`, orgUUID, limit)
@@ -129,6 +135,7 @@ func (r *Repository) List(ctx context.Context, userID, orgID string, limit int) 
 		}
 		rows, err = r.db.Query(ctx,
 			`SELECT id, user_id, org_id, client_name, app_display_name, play_app_id, appstore_app_id,
+			        country, lang, play_review_limit, appstore_review_limit,
 			        mode, status, step, play_fetched, appstore_fetched, total_reviews, analyzed_count,
 			        truncated, error_message, started_at, completed_at, created_at
 			 FROM app_audits WHERE user_id = $1 AND org_id IS NULL ORDER BY created_at DESC LIMIT $2`, userUUID, limit)
@@ -408,6 +415,28 @@ func (r *Repository) GetInsights(ctx context.Context, auditID string) (*auditMod
 	return &ins, nil
 }
 
+func (r *Repository) Delete(ctx context.Context, id, userID, orgID string) error {
+	auditUUID, err := uuid.Parse(id)
+	if err != nil {
+		return ErrNotFound
+	}
+	a, err := r.Get(ctx, id, userID, orgID)
+	if err != nil {
+		return err
+	}
+	if a.ID == "" {
+		return ErrNotFound
+	}
+	tag, err := r.db.Exec(ctx, `DELETE FROM app_audits WHERE id = $1`, auditUUID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func scanAudits(rows pgx.Rows) ([]auditModel.Audit, error) {
 	var out []auditModel.Audit
 	for rows.Next() {
@@ -418,6 +447,7 @@ func scanAudits(rows pgx.Rows) ([]auditModel.Audit, error) {
 		var started, completed *time.Time
 		if err := rows.Scan(
 			&id, &uid, &orgUUID, &a.ClientName, &a.AppDisplayName, &playID, &appstoreID,
+			&a.Country, &a.Lang, &a.PlayReviewLimit, &a.AppStoreReviewLimit,
 			&a.Mode, &a.Status, &a.Step, &a.PlayFetched, &a.AppStoreFetched, &a.TotalReviews,
 			&a.AnalyzedCount, &a.Truncated, &errMsg, &started, &completed, &a.CreatedAt,
 		); err != nil {

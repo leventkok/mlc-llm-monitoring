@@ -26,7 +26,7 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		response.LegacyError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	out, err := h.svc.SearchApps(r.Context(), req.Query)
+	out, err := h.svc.SearchApps(r.Context(), req.Query, req.Country, req.Lang)
 	if err != nil {
 		response.LegacyError(w, http.StatusBadGateway, err.Error())
 		return
@@ -101,4 +101,21 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.LegacyJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.LegacyUserID(r.Context())
+	if !ok {
+		response.LegacyError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if err := h.svc.DeleteAudit(r.Context(), userID, chi.URLParam(r, "id")); err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "audit not found" {
+			status = http.StatusNotFound
+		}
+		response.LegacyError(w, status, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

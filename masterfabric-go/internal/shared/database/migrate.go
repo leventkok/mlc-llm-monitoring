@@ -124,6 +124,10 @@ var legacyMigrations = []string{
 	    completed_at     TIMESTAMPTZ,
 	    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 	)`,
+	`ALTER TABLE app_audits ADD COLUMN IF NOT EXISTS country TEXT NOT NULL DEFAULT 'tr'`,
+	`ALTER TABLE app_audits ADD COLUMN IF NOT EXISTS lang TEXT NOT NULL DEFAULT 'tr'`,
+	`ALTER TABLE app_audits ADD COLUMN IF NOT EXISTS play_review_limit INT NOT NULL DEFAULT 0`,
+	`ALTER TABLE app_audits ADD COLUMN IF NOT EXISTS appstore_review_limit INT NOT NULL DEFAULT 0`,
 	`CREATE INDEX IF NOT EXISTS app_audits_user_id_idx ON app_audits (user_id, created_at DESC)`,
 	`CREATE INDEX IF NOT EXISTS app_audits_org_id_idx ON app_audits (org_id, created_at DESC)`,
 	`CREATE TABLE IF NOT EXISTS audit_reviews (
