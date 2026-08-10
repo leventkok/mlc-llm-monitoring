@@ -35,12 +35,18 @@ var categoryLabels = map[appVertical]map[string]string{
 		"other":   "Operasyon / deneyim",
 	},
 	verticalGeneric: {
-		"bug":     "Uygulama / hata",
+		"bug":     "Uygulama hatası / performans",
 		"feature": "Özellik talebi",
 		"praise":  "Memnuniyet",
 		"spam":    "Spam / gürültü",
 		"other":   "Genel geri bildirim",
 	},
+}
+
+var healthAppKeywords = []string{
+	"kalori", "calorie", "sağlık", "health", "diyet", "diet", "fitness", "egzersiz",
+	"weight", "kilo", "beslenme", "nutrition", "wellness", "macro", "yemek", "adım",
+	"step", "tracker", "medical", "doctor", "hospital", "pill", "ilaç",
 }
 
 var gameKeywords = []string{
@@ -54,37 +60,32 @@ var commerceKeywords = []string{
 }
 
 func detectAppVertical(appName, clientName string, samples []auditModel.Review) appVertical {
-	blob := strings.ToLower(appName + " " + clientName)
-	gameScore, commerceScore := 0, 0
+	nameBlob := strings.ToLower(appName + " " + clientName)
+	for _, kw := range healthAppKeywords {
+		if strings.Contains(nameBlob, kw) {
+			return verticalGeneric
+		}
+	}
+
+	gameNameScore, commerceNameScore := 0, 0
 	for _, kw := range gameKeywords {
-		if strings.Contains(blob, kw) {
-			gameScore += 3
+		if strings.Contains(nameBlob, kw) {
+			gameNameScore += 5
 		}
 	}
 	for _, kw := range commerceKeywords {
-		if strings.Contains(blob, kw) {
-			commerceScore += 3
+		if strings.Contains(nameBlob, kw) {
+			commerceNameScore += 5
 		}
 	}
-	for _, rv := range samples {
-		text := strings.ToLower(rv.Text)
-		for _, kw := range gameKeywords {
-			if strings.Contains(text, kw) {
-				gameScore++
-			}
-		}
-		for _, kw := range commerceKeywords {
-			if strings.Contains(text, kw) {
-				commerceScore++
-			}
-		}
-	}
-	if gameScore > commerceScore && gameScore >= 2 {
+	// Oyun etiketleri yalnızca uygulama adı/markası oyun olduğunda — yorumdaki "Brawl Stars" vb. tetiklemesin.
+	if gameNameScore >= 5 && gameNameScore > commerceNameScore {
 		return verticalGame
 	}
-	if commerceScore > gameScore && commerceScore >= 2 {
+	if commerceNameScore >= 5 && commerceNameScore > gameNameScore {
 		return verticalCommerce
 	}
+	_ = samples
 	return verticalGeneric
 }
 

@@ -311,6 +311,17 @@ func mergeFeaturedReviews(base, fromLLM []auditModel.FeaturedReview) []auditMode
 	return fromLLM
 }
 
+func applyVerticalCategoryLabels(insights []auditModel.CategoryInsight, vertical appVertical) []auditModel.CategoryInsight {
+	for i := range insights {
+		cat := insights[i].Category
+		if cat == "" {
+			cat = "other"
+		}
+		insights[i].Label = themeLabelFor(vertical, cat)
+	}
+	return insights
+}
+
 func mergeCategoryInsights(base, fromLLM []auditModel.CategoryInsight) []auditModel.CategoryInsight {
 	if len(fromLLM) == 0 {
 		return base
@@ -327,9 +338,10 @@ func mergeCategoryInsights(base, fromLLM []auditModel.CategoryInsight) []auditMo
 			if c.Count == 0 {
 				c.Count = existing.Count
 			}
-			if c.Label == "" {
-				c.Label = existing.Label
+			if c.Pct == 0 {
+				c.Pct = existing.Pct
 			}
+			c.Label = existing.Label
 		}
 		byCat[c.Category] = c
 	}

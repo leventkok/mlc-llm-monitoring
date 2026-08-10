@@ -45,6 +45,7 @@ func (s *Service) SearchApps(ctx context.Context, query, country, lang string) (
 	}
 	country = normalizeCountry(country)
 	lang = normalizeLang(lang)
+	_ = s.store.Warmup(ctx)
 	var play []infraStore.AppResult
 	var appstore []infraStore.AppResult
 	var playErr, appstoreErr error
@@ -249,6 +250,7 @@ func (s *Service) runAudit(auditID, userID, orgID string) {
 	if appStoreLimit <= 0 {
 		appStoreLimit = limit
 	}
+	_ = s.store.Warmup(ctx)
 	crawl, err := s.store.CrawlApps(ctx, infraStore.CrawlOptions{
 		AppName:             a.AppDisplayName,
 		PlayAppID:           a.PlayAppID,
@@ -494,6 +496,7 @@ Sınıflandırılmış yorum örnekleri:
 		}
 		llmCats, llmFeat, llmBug, llmFeatured := parseFeedbackFromRaw(raw)
 		categoryInsights = mergeCategoryInsights(categoryInsights, llmCats)
+		categoryInsights = applyVerticalCategoryLabels(categoryInsights, vertical)
 		featureSuggestions = mergeFeedbackSuggestions(featureSuggestions, llmFeat, "feature")
 		bugSuggestions = mergeFeedbackSuggestions(bugSuggestions, llmBug, "bug")
 		featuredReviews = mergeFeaturedReviews(featuredReviews, llmFeatured)

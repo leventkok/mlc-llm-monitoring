@@ -345,7 +345,7 @@ export default function AuditReportView({ audit, insights }: { audit: Audit; ins
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs text-muted">
           {showPlay && (
             <span>
-              Play: <span className="text-foreground">{playCount}</span>
+              Play Store: <span className="text-foreground">{playCount}</span>
             </span>
           )}
           {showAppStore && (

@@ -38,6 +38,11 @@ export default function ReportDetailPage() {
 
   const audit = report?.audit;
   const insights = report?.insights;
+  const showPlay = Boolean(audit?.play_app_id);
+  const showAppStore = Boolean(audit?.appstore_app_id);
+  const storeParts: string[] = [];
+  if (audit && showPlay) storeParts.push(`Play Store ${audit.play_fetched}`);
+  if (audit && showAppStore) storeParts.push(`App Store ${audit.appstore_fetched}`);
 
   return (
     <ProtectedRoute>
@@ -54,8 +59,8 @@ export default function ReportDetailPage() {
                 </p>
                 <p className="mt-2">Crawling and analyzing…</p>
                 <p className="mt-2 font-mono text-muted">
-                  Play {audit.play_fetched} · App Store {audit.appstore_fetched} · analyzed{" "}
-                  {audit.analyzed_count}/{audit.total_reviews}
+                  {storeParts.length > 0 ? `${storeParts.join(" · ")} · ` : ""}
+                  analyzed {audit.analyzed_count}/{audit.total_reviews}
                 </p>
               </div>
             )}

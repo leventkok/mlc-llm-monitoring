@@ -86,6 +86,71 @@ type crawlRequest struct {
 	Country         string `json:"country"`
 }
 
+// Warmup pings the worker (Render cold start). Errors are ignored.
+func (c *Client) Warmup(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/health", nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{Timeout: 90 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
+func sanitizeStoreErr(action string, status int, body []byte) error {
+	msg := strings.TrimSpace(string(body))
+	if strings.Contains(strings.ToLower(msg), "<!doctype") || strings.Contains(strings.ToLower(msg), "<html") {
+		if status == 502 || status == 503 || status == 504 {
+			return fmt.Errorf("store worker geçici olarak yanıt vermiyor (Render cold start). 1–2 dakika bekleyip tekrar deneyin")
+		}
+		return fmt.Errorf("store worker hatası (%d)", status)
+	}
+	if len(msg) > 240 {
+		msg = msg[:240] + "…"
+	}
+	if msg == "" {
+		return fmt.Errorf("store %s failed with status %d", action, status)
+	}
+	return fmt.Errorf("store %s %d: %s", action, status, msg)
+}
+
+func retryableStatus(status int) bool {
+	return status == 502 || status == 503 || status == 504
+}
+
+func (c *Client) doGET(ctx context.Context, rawURL string) ([]byte, int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("store worker unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	return body, resp.StatusCode, nil
+}
+
+func (c *Client) doPOST(ctx context.Context, path string, payload []byte) ([]byte, int, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
+	if err != nil {
+		return nil, 0, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, 0, fmt.Errorf("store worker unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	return body, resp.StatusCode, nil
+}
+
 func (c *Client) Search(ctx context.Context, store, query, country, lang string, limit int) ([]AppResult, error) {
 	u, err := url.Parse(c.baseURL + "/search")
 	if err != nil {
@@ -102,27 +167,41 @@ func (c *Client) Search(ctx context.Context, store, query, country, lang string,
 		q.Set("lang", strings.TrimSpace(lang))
 	}
 	u.RawQuery = q.Encode()
+	target := u.String()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil, err
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(attempt) * 8 * time.Second):
+			}
+		}
+		body, status, err := c.doGET(ctx, target)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if status >= 400 {
+			lastErr = sanitizeStoreErr("search", status, body)
+			if retryableStatus(status) {
+				continue
+			}
+			return nil, lastErr
+		}
+		var parsed struct {
+			Apps []AppResult `json:"apps"`
+		}
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			return nil, err
+		}
+		return parsed.Apps, nil
 	}
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("store worker unreachable: %w", err)
+	if lastErr != nil {
+		return nil, lastErr
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("store search %d: %s", resp.StatusCode, string(body))
-	}
-	var parsed struct {
-		Apps []AppResult `json:"apps"`
-	}
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return nil, err
-	}
-	return parsed.Apps, nil
+	return nil, fmt.Errorf("store search failed after retries")
 }
 
 func (c *Client) Crawl(ctx context.Context, req crawlRequest) (CrawlResult, error) {
@@ -130,25 +209,38 @@ func (c *Client) Crawl(ctx context.Context, req crawlRequest) (CrawlResult, erro
 	if err != nil {
 		return CrawlResult{}, err
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/crawl", bytes.NewReader(payload))
-	if err != nil {
-		return CrawlResult{}, err
+
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return CrawlResult{}, ctx.Err()
+			case <-time.After(time.Duration(attempt) * 8 * time.Second):
+			}
+		}
+		body, status, err := c.doPOST(ctx, "/crawl", payload)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if status >= 400 {
+			lastErr = sanitizeStoreErr("crawl", status, body)
+			if retryableStatus(status) {
+				continue
+			}
+			return CrawlResult{}, lastErr
+		}
+		var result CrawlResult
+		if err := json.Unmarshal(body, &result); err != nil {
+			return CrawlResult{}, err
+		}
+		return result, nil
 	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return CrawlResult{}, fmt.Errorf("store worker unreachable: %w", err)
+	if lastErr != nil {
+		return CrawlResult{}, lastErr
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode >= 400 {
-		return CrawlResult{}, fmt.Errorf("store crawl %d: %s", resp.StatusCode, string(body))
-	}
-	var result CrawlResult
-	if err := json.Unmarshal(body, &result); err != nil {
-		return CrawlResult{}, err
-	}
-	return result, nil
+	return CrawlResult{}, fmt.Errorf("store crawl failed after retries")
 }
 
 func (c *Client) CrawlApps(ctx context.Context, opts CrawlOptions) (CrawlResult, error) {

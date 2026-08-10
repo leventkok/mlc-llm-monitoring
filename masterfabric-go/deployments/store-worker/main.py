@@ -17,25 +17,33 @@ DEFAULT_LANG = os.environ.get("STORE_DEFAULT_LANG", "tr")
 DEFAULT_COUNTRY = os.environ.get("STORE_DEFAULT_COUNTRY", "tr")
 
 
-def _resolve_play_app_id(query: str, hit: dict[str, Any], lang: str, country: str) -> str:
+def _resolve_play_app_id(
+    query: str,
+    hit: dict[str, Any],
+    lang: str,
+    country: str,
+    cache: dict[str, str],
+) -> str:
     app_id = hit.get("appId") or ""
     if app_id:
         return app_id
     slug = re.sub(r"[^a-z0-9]", "", query.lower())
     if not slug:
         return ""
+    hit_title = (hit.get("title") or "").lower()
+    developer = (hit.get("developer") or "").lower()
+    if slug not in hit_title and slug not in developer:
+        return ""
+    cache_key = f"{slug}:{lang}:{country}"
+    if cache_key in cache:
+        return cache[cache_key]
     candidate = f"com.{slug}.app"
     try:
         info = play_app(candidate, lang=lang, country=country)
+        cache[cache_key] = info.get("appId") or candidate
     except Exception:
-        return ""
-    hit_title = (hit.get("title") or "").lower()
-    info_title = (info.get("title") or "").lower()
-    if not hit_title or not info_title:
-        return info.get("appId") or candidate
-    if slug in hit_title or slug in info_title:
-        return info.get("appId") or candidate
-    return ""
+        cache[cache_key] = ""
+    return cache[cache_key]
 
 
 def _iso(dt: Any) -> str | None:
@@ -67,8 +75,9 @@ def search_apps(
     if store == "play":
         hits = search(q, lang=lang, country=country, n_hits=min(limit * 2, 20))
         apps = []
+        id_cache: dict[str, str] = {}
         for h in hits:
-            app_id = _resolve_play_app_id(q, h, lang, country)
+            app_id = _resolve_play_app_id(q, h, lang, country, id_cache)
             if not app_id:
                 continue
             apps.append(
