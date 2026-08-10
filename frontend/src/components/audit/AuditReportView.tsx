@@ -29,6 +29,15 @@ type FeaturedReview = {
 };
 type TimelineItem = { horizon?: string; tag?: string; title?: string; body?: string };
 type Priority = { rank?: number; title?: string; body?: string };
+type StoreInsightBlock = {
+  store?: string;
+  label?: string;
+  statistics?: Record<string, unknown>;
+  category_insights?: CategoryInsight[];
+  feature_suggestions?: FeedbackSuggestion[];
+  bug_suggestions?: FeedbackSuggestion[];
+  featured_reviews?: FeaturedReview[];
+};
 type Finding = { title?: string; body?: string };
 
 function num(v: unknown, digits = 2) {
@@ -153,6 +162,118 @@ function CategoryChart({ insights: cats, total }: { insights: CategoryInsight[];
   );
 }
 
+function StoreInsightSection({ block }: { block: StoreInsightBlock }) {
+  const blockStats = block.statistics ?? {};
+  const ratingDist = list<Bucket>(blockStats.rating_distribution);
+  const sentiment = (blockStats.sentiment_breakdown ?? {}) as Record<string, SentimentBucket>;
+  const categoryInsights = list<CategoryInsight>(block.category_insights);
+  const featureSuggestions = list<FeedbackSuggestion>(block.feature_suggestions);
+  const bugSuggestions = list<FeedbackSuggestion>(block.bug_suggestions);
+  const featuredReviews = list<FeaturedReview>(block.featured_reviews);
+  const totalReviews = Number(blockStats.total_reviews ?? 0);
+  const avgRating = Number(blockStats.avg_rating ?? 0);
+
+  return (
+    <section className="space-y-6 rounded-2xl border border-border bg-surface/40 p-5">
+      <div>
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent">{block.label ?? block.store}</p>
+        <h2 className="mt-2 text-lg font-medium text-foreground">{block.label ?? block.store} analizi</h2>
+        <p className="mt-1 text-sm text-muted">
+          {totalReviews} yorum · ort. {num(avgRating)}★
+        </p>
+      </div>
+
+      {ratingDist.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Panel>
+            <h3 className="mb-4 font-mono text-xs uppercase tracking-wider text-muted">Yıldız dağılımı</h3>
+            <div className="space-y-3">
+              {ratingDist.map((b) => (
+                <BarRow
+                  key={b.star}
+                  label={`${b.star} ★`}
+                  pct={Number(b.pct ?? 0)}
+                  count={Number(b.count ?? 0)}
+                  tone={
+                    (b.star ?? 0) <= 2 ? "bg-red-500" : (b.star ?? 0) === 3 ? "bg-amber-500" : "bg-accent"
+                  }
+                />
+              ))}
+            </div>
+          </Panel>
+          <Panel>
+            <h3 className="mb-4 font-mono text-xs uppercase tracking-wider text-muted">Duygu özeti</h3>
+            <div className="space-y-4">
+              {[
+                { key: "negative", label: "Olumsuz", cls: "bg-red-500/10 text-red-500 border-red-500/20" },
+                { key: "neutral", label: "Nötr", cls: "bg-amber-500/10 text-amber-500 border-amber-500/20" },
+                { key: "positive", label: "Olumlu", cls: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" },
+              ].map((s) => {
+                const b = sentiment[s.key] ?? {};
+                return (
+                  <div key={s.key} className="flex items-end justify-between border-b border-border pb-3 last:border-0">
+                    <span className={`rounded-md border px-2 py-0.5 text-xs font-medium uppercase ${s.cls}`}>
+                      {s.label}
+                    </span>
+                    <div className="text-right">
+                      <p className="font-mono text-xl text-foreground">{b.count ?? 0}</p>
+                      <p className="text-sm text-muted">%{num(b.pct, 1)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Panel>
+        </div>
+      )}
+
+      {categoryInsights.length > 0 && (
+        <div>
+          <h3 className="font-medium text-foreground">Kategori kırılımı</h3>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {categoryInsights.map((cat) => (
+              <Panel key={cat.category ?? cat.label}>
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="font-medium text-foreground">{cat.label ?? cat.category}</h4>
+                  <span className="font-mono text-xs text-muted">
+                    {cat.count ?? 0} · %{num(cat.pct, 1)}
+                  </span>
+                </div>
+                <ReviewQuotes quotes={list<ReviewQuote>(cat.reviews)} />
+              </Panel>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(featureSuggestions.length > 0 || bugSuggestions.length > 0) && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SuggestionList title="Özellik önerileri" items={featureSuggestions} tone="feature" />
+          <SuggestionList title="Hata / şikâyetler" items={bugSuggestions} tone="bug" />
+        </div>
+      )}
+
+      {featuredReviews.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {featuredReviews.slice(0, 4).map((rv, i) => (
+            <Panel key={i}>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-sm text-foreground">{rv.rating ?? "?"}★</span>
+                {rv.category && (
+                  <span className={`rounded border px-1.5 py-0.5 text-[10px] ${categoryBadge(String(rv.category))}`}>
+                    {rv.category}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm leading-relaxed text-foreground">&ldquo;{rv.text}&rdquo;</p>
+            </Panel>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SuggestionList({
   title,
   items,
@@ -210,6 +331,10 @@ export default function AuditReportView({ audit, insights }: { audit: Audit; ins
 
   const playCount = Number(stats.play_count ?? audit.play_fetched ?? 0);
   const appStoreCount = Number(stats.appstore_count ?? audit.appstore_fetched ?? 0);
+  const storeBreakdown = list<StoreInsightBlock>(stats.store_breakdown);
+  const hasDualStore = storeBreakdown.length >= 2;
+  const showPlay = Boolean(audit.play_app_id) || playCount > 0;
+  const showAppStore = Boolean(audit.appstore_app_id) || appStoreCount > 0;
 
   return (
     <div className="space-y-8">
@@ -218,12 +343,16 @@ export default function AuditReportView({ audit, insights }: { audit: Audit; ins
         <h1 className="mt-3 text-2xl font-medium text-foreground">{audit.client_name}</h1>
         <p className="mt-2 text-sm text-muted">{audit.app_display_name}</p>
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs text-muted">
-          <span>
-            Play: <span className="text-foreground">{playCount}</span>
-          </span>
-          <span>
-            App Store: <span className="text-foreground">{appStoreCount}</span>
-          </span>
+          {showPlay && (
+            <span>
+              Play: <span className="text-foreground">{playCount}</span>
+            </span>
+          )}
+          {showAppStore && (
+            <span>
+              App Store: <span className="text-foreground">{appStoreCount}</span>
+            </span>
+          )}
           <span>
             Mod: <span className="text-foreground">{audit.mode}</span>
           </span>
@@ -239,6 +368,25 @@ export default function AuditReportView({ audit, insights }: { audit: Audit; ins
           </div>
         )}
       </header>
+
+      {hasDualStore && (
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-lg font-medium text-foreground">Mağaza bazlı analiz</h2>
+            <p className="mt-1 text-sm text-muted">Her mağaza için ayrı istatistik ve geri bildirim özeti.</p>
+          </div>
+          {storeBreakdown.map((block) => (
+            <StoreInsightSection key={block.store ?? block.label} block={block} />
+          ))}
+        </section>
+      )}
+
+      {hasDualStore && (
+        <div className="border-t border-border pt-2">
+          <h2 className="text-lg font-medium text-foreground">Birleşik analiz</h2>
+          <p className="mt-1 text-sm text-muted">Her iki mağazanın yorumları birlikte değerlendirildi.</p>
+        </div>
+      )}
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Yazılı yorum" value={String(totalReviews)} hint="Analiz edilen metin" />

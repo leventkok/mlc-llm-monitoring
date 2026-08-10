@@ -2,18 +2,40 @@
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime, timezone
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
-from google_play_scraper import Sort, reviews, search
+from google_play_scraper import Sort, app as play_app, reviews, search
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="InferReview Store Worker", version="1.0")
 
 DEFAULT_LANG = os.environ.get("STORE_DEFAULT_LANG", "tr")
 DEFAULT_COUNTRY = os.environ.get("STORE_DEFAULT_COUNTRY", "tr")
+
+
+def _resolve_play_app_id(query: str, hit: dict[str, Any], lang: str, country: str) -> str:
+    app_id = hit.get("appId") or ""
+    if app_id:
+        return app_id
+    slug = re.sub(r"[^a-z0-9]", "", query.lower())
+    if not slug:
+        return ""
+    candidate = f"com.{slug}.app"
+    try:
+        info = play_app(candidate, lang=lang, country=country)
+    except Exception:
+        return ""
+    hit_title = (hit.get("title") or "").lower()
+    info_title = (info.get("title") or "").lower()
+    if not hit_title or not info_title:
+        return info.get("appId") or candidate
+    if slug in hit_title or slug in info_title:
+        return info.get("appId") or candidate
+    return ""
 
 
 def _iso(dt: Any) -> str | None:
@@ -43,18 +65,23 @@ def search_apps(
     country = (country or DEFAULT_COUNTRY).strip().lower()
     lang = (lang or DEFAULT_LANG).strip().lower()
     if store == "play":
-        hits = search(q, lang=lang, country=country, n_hits=limit)
+        hits = search(q, lang=lang, country=country, n_hits=min(limit * 2, 20))
         apps = []
         for h in hits:
+            app_id = _resolve_play_app_id(q, h, lang, country)
+            if not app_id:
+                continue
             apps.append(
                 {
                     "store": "play",
-                    "app_id": h.get("appId") or "",
+                    "app_id": app_id,
                     "app_name": h.get("title") or "",
                     "developer": h.get("developer") or "",
                     "icon_url": h.get("icon") or "",
                 }
             )
+            if len(apps) >= limit:
+                break
         return {"store": "play", "query": q, "apps": apps}
 
     with httpx.Client(timeout=30.0) as client:

@@ -36,37 +36,92 @@ export default function NewReportPage() {
   const [appStoreApps, setAppStoreApps] = useState<StoreApp[]>([]);
   const [playApp, setPlayApp] = useState<StoreApp | null>(null);
   const [appStoreApp, setAppStoreApp] = useState<StoreApp | null>(null);
+  const [searchBusy, setSearchBusy] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
+
+  function pickDefaultApp(apps: StoreApp[], enabled: boolean): StoreApp | null {
+    if (!enabled) return null;
+    return apps.find((a) => a.app_id.trim()) ?? null;
+  }
 
   const modeCap = mode === "full" ? 10000 : 500;
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!query.trim()) return;
-    setBusy(true);
+    setSearchBusy(true);
     setError("");
+    setSearched(false);
+    setPlayApps([]);
+    setAppStoreApps([]);
+    setPlayApp(null);
+    setAppStoreApp(null);
     try {
       const res = await auditApi.search(query.trim(), country);
-      setPlayApps(res.play);
-      setAppStoreApps(res.appstore);
-      setPlayApp(includePlay ? (res.play[0] ?? null) : null);
-      setAppStoreApp(includeAppStore ? (res.appstore[0] ?? null) : null);
-      if (!clientName.trim() && res.play[0]) setClientName(res.play[0].app_name);
+      const play = res.play.filter((a) => a.app_id.trim());
+      const appstore = res.appstore.filter((a) => a.app_id.trim());
+      setPlayApps(play);
+      setAppStoreApps(appstore);
+      setPlayApp(pickDefaultApp(play, includePlay));
+      setAppStoreApp(pickDefaultApp(appstore, includeAppStore));
+      const first = play[0] ?? appstore[0];
+      if (!clientName.trim() && first) setClientName(first.app_name);
+      setSearched(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Search failed");
+      setError(err instanceof Error ? err.message : "Arama başarısız");
+      setSearched(true);
     } finally {
-      setBusy(false);
+      setSearchBusy(false);
     }
+  }
+
+  function resolvePlayId() {
+    if (!includePlay) return "";
+    return playApp?.app_id?.trim() || playApps.find((a) => a.app_id.trim())?.app_id || "";
+  }
+
+  function resolveAppStoreId() {
+    if (!includeAppStore) return "";
+    return appStoreApp?.app_id?.trim() || appStoreApps.find((a) => a.app_id.trim())?.app_id || "";
+  }
+
+  function onIncludePlayChange(checked: boolean) {
+    if (!checked && !includeAppStore) return;
+    setIncludePlay(checked);
+    setPlayApp(checked ? pickDefaultApp(playApps, true) : null);
+  }
+
+  function onIncludeAppStoreChange(checked: boolean) {
+    if (!checked && !includePlay) return;
+    setIncludeAppStore(checked);
+    setAppStoreApp(checked ? pickDefaultApp(appStoreApps, true) : null);
   }
 
   async function handleStart(e: React.FormEvent) {
     e.preventDefault();
     if (!clientName.trim()) return;
-    const playId = includePlay ? playApp?.app_id : undefined;
-    const appStoreId = includeAppStore ? appStoreApp?.app_id : undefined;
-    if (!playId && !appStoreId) {
+    if (!includePlay && !includeAppStore) {
       setError("En az bir mağaza seçin");
+      return;
+    }
+    const playId = resolvePlayId();
+    const appStoreId = resolveAppStoreId();
+    if (includePlay && playApps.length === 0) {
+      setError("Google Play sonucu yok — aramayı tekrarlayın veya yalnızca App Store seçin");
+      return;
+    }
+    if (includeAppStore && appStoreApps.length === 0) {
+      setError("App Store sonucu yok — aramayı tekrarlayın veya yalnızca Google Play seçin");
+      return;
+    }
+    if (includePlay && !playId) {
+      setError("Geçerli bir Google Play uygulaması seçin");
+      return;
+    }
+    if (includeAppStore && !appStoreId) {
+      setError("Geçerli bir App Store uygulaması seçin");
       return;
     }
     setBusy(true);
@@ -75,8 +130,8 @@ export default function NewReportPage() {
       const audit = await auditApi.create({
         client_name: clientName.trim(),
         app_display_name: query.trim() || playApp?.app_name || appStoreApp?.app_name || clientName.trim(),
-        play_app_id: playId,
-        appstore_app_id: appStoreId,
+        play_app_id: includePlay ? playId : undefined,
+        appstore_app_id: includeAppStore ? appStoreId : undefined,
         country,
         play_review_limit: includePlay && playLimit > 0 ? playLimit : undefined,
         appstore_review_limit: includeAppStore && appStoreLimit > 0 ? appStoreLimit : undefined,
@@ -122,12 +177,22 @@ export default function NewReportPage() {
             </select>
           </label>
 
+          {error && !playApps.length && !appStoreApps.length && (
+            <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-500">{error}</p>
+          )}
+
+          {searched && !searchBusy && !playApps.length && !appStoreApps.length && !error && (
+            <p className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted">
+              &quot;{query.trim()}&quot; için mağazada sonuç bulunamadı. Farklı bir yazım veya ülke deneyin.
+            </p>
+          )}
+
           <button
             type="submit"
-            disabled={busy}
+            disabled={searchBusy || busy}
             className="rounded-lg border border-accent px-4 py-2 text-sm text-accent disabled:opacity-50"
           >
-            Mağazalarda ara
+            {searchBusy ? "Mağazalarda aranıyor… (30–60 sn sürebilir)" : "Mağazalarda ara"}
           </button>
         </form>
 
@@ -140,14 +205,18 @@ export default function NewReportPage() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex items-center gap-2 text-sm text-foreground">
-                <input type="checkbox" checked={includePlay} onChange={(e) => setIncludePlay(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={includePlay}
+                  onChange={(e) => onIncludePlayChange(e.target.checked)}
+                />
                 Google Play çek
               </label>
               <label className="flex items-center gap-2 text-sm text-foreground">
                 <input
                   type="checkbox"
                   checked={includeAppStore}
-                  onChange={(e) => setIncludeAppStore(e.target.checked)}
+                  onChange={(e) => onIncludeAppStoreChange(e.target.checked)}
                 />
                 App Store çek
               </label>

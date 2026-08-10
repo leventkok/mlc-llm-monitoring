@@ -57,6 +57,16 @@ type Review struct {
 	RawOutput     string
 }
 
+type StoreInsight struct {
+	Store              string               `json:"store"`
+	Label              string               `json:"label"`
+	Statistics         Statistics           `json:"statistics"`
+	CategoryInsights   []CategoryInsight    `json:"category_insights,omitempty"`
+	FeatureSuggestions []FeedbackSuggestion `json:"feature_suggestions,omitempty"`
+	BugSuggestions     []FeedbackSuggestion `json:"bug_suggestions,omitempty"`
+	FeaturedReviews    []FeaturedReview     `json:"featured_reviews,omitempty"`
+}
+
 type Statistics struct {
 	TotalReviews   int                `json:"total_reviews"`
 	PlayCount      int                `json:"play_count"`
@@ -71,6 +81,7 @@ type Statistics struct {
 	RatingDistribution []RatingBucket `json:"rating_distribution,omitempty"`
 	SentimentBreakdown   map[string]SentimentBucket `json:"sentiment_breakdown,omitempty"`
 	ThemeIntensity       []ThemeIntensity           `json:"theme_intensity,omitempty"`
+	StoreBreakdown       []StoreInsight             `json:"store_breakdown,omitempty"`
 	ReportMeta             *ReportMeta                `json:"report_meta,omitempty"`
 }
 

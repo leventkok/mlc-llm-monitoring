@@ -45,13 +45,25 @@ func (s *Service) SearchApps(ctx context.Context, query, country, lang string) (
 	}
 	country = normalizeCountry(country)
 	lang = normalizeLang(lang)
-	play, err := s.store.Search(ctx, "play", query, country, lang, 8)
-	if err != nil {
-		return auditDTO.SearchAppsResponse{}, err
+	var play []infraStore.AppResult
+	var appstore []infraStore.AppResult
+	var playErr, appstoreErr error
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		play, playErr = s.store.Search(ctx, "play", query, country, lang, 8)
+	}()
+	go func() {
+		defer wg.Done()
+		appstore, appstoreErr = s.store.Search(ctx, "appstore", query, country, lang, 8)
+	}()
+	wg.Wait()
+	if playErr != nil {
+		return auditDTO.SearchAppsResponse{}, playErr
 	}
-	appstore, err := s.store.Search(ctx, "appstore", query, country, lang, 8)
-	if err != nil {
-		return auditDTO.SearchAppsResponse{}, err
+	if appstoreErr != nil {
+		return auditDTO.SearchAppsResponse{}, appstoreErr
 	}
 	return auditDTO.SearchAppsResponse{
 		Play:     mapApps(play),
@@ -413,6 +425,7 @@ func (s *Service) generateInsights(ctx context.Context, auditID string, a auditM
 	featureSuggestions := buildFeatureSuggestions(classified)
 	bugSuggestions := buildBugSuggestions(classified)
 	featuredReviews := buildFeaturedReviews(classified)
+	stats.StoreBreakdown = buildStoreBreakdown(a, classified, vertical)
 
 	prompt := fmt.Sprintf(`Sen mobil uygulama danışmanısın. Aşağıdaki uygulama için Türkçe müşteri sunumu raporu üret.
 

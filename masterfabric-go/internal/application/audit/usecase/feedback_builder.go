@@ -171,6 +171,82 @@ func buildFeaturedReviews(reviews []auditModel.Review) []auditModel.FeaturedRevi
 	return out
 }
 
+func computeStoreStats(reviews []auditModel.Review) auditModel.Statistics {
+	stats := auditModel.Statistics{
+		CategoryCounts:  map[string]int{},
+		SentimentCounts: map[string]int{},
+		RatingCounts:    map[string]int{},
+	}
+	var ratingSum int
+	for _, rv := range reviews {
+		stats.TotalReviews++
+		key := fmt.Sprintf("%d", rv.Rating)
+		stats.RatingCounts[key]++
+		ratingSum += rv.Rating
+		cat := rv.Category
+		if cat == "" {
+			cat = "other"
+		}
+		stats.CategoryCounts[cat]++
+		if rv.Sentiment != "" {
+			stats.SentimentCounts[rv.Sentiment]++
+		}
+	}
+	if stats.TotalReviews > 0 {
+		stats.AvgRating = float64(ratingSum) / float64(stats.TotalReviews)
+		low := stats.RatingCounts["1"] + stats.RatingCounts["2"]
+		stats.LowStarPct = roundPct(float64(low) / float64(stats.TotalReviews) * 100)
+	}
+	return enrichStatistics(stats)
+}
+
+func buildStoreBreakdown(a auditModel.Audit, classified []auditModel.Review, vertical appVertical) []auditModel.StoreInsight {
+	type storeSpec struct {
+		key   string
+		label string
+	}
+	var specs []storeSpec
+	if strings.TrimSpace(a.PlayAppID) != "" {
+		specs = append(specs, storeSpec{"play", "Google Play"})
+	}
+	if strings.TrimSpace(a.AppStoreAppID) != "" {
+		specs = append(specs, storeSpec{"appstore", "App Store"})
+	}
+	if len(specs) <= 1 {
+		return nil
+	}
+
+	out := make([]auditModel.StoreInsight, 0, len(specs))
+	for _, spec := range specs {
+		subset := make([]auditModel.Review, 0)
+		for _, rv := range classified {
+			if rv.Store == spec.key {
+				subset = append(subset, rv)
+			}
+		}
+		if len(subset) == 0 {
+			continue
+		}
+		storeStats := computeStoreStats(subset)
+		if spec.key == "play" {
+			storeStats.PlayCount = len(subset)
+		} else {
+			storeStats.AppStoreCount = len(subset)
+		}
+		storeStats = enrichStatisticsForVertical(storeStats, vertical)
+		out = append(out, auditModel.StoreInsight{
+			Store:              spec.key,
+			Label:              spec.label,
+			Statistics:         storeStats,
+			CategoryInsights:   buildCategoryInsights(storeStats, subset, vertical),
+			FeatureSuggestions: buildFeatureSuggestions(subset),
+			BugSuggestions:     buildBugSuggestions(subset),
+			FeaturedReviews:    buildFeaturedReviews(subset),
+		})
+	}
+	return out
+}
+
 func sampleQuotes(reviews []auditModel.Review, n int) []auditModel.ReviewQuote {
 	if len(reviews) == 0 {
 		return nil
