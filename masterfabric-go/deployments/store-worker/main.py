@@ -255,9 +255,13 @@ def crawl(req: CrawlRequest) -> dict[str, Any]:
 
     combined = play_rows + appstore_rows
     combined.sort(key=lambda r: r.get("reviewed_at") or "", reverse=True)
-    truncated = len(combined) > req.limit
+    if req.play_limit is not None or req.appstore_limit is not None or req.per_store_limit is not None:
+        combined_cap = play_cap + appstore_cap
+    else:
+        combined_cap = req.limit
+    truncated = len(combined) > combined_cap
     if truncated:
-        combined = combined[: req.limit]
+        combined = combined[:combined_cap]
 
     return {
         "app_name": app_name,

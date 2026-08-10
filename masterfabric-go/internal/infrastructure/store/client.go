@@ -255,22 +255,37 @@ func (c *Client) CrawlApps(ctx context.Context, opts CrawlOptions) (CrawlResult,
 
 	playLimit := opts.PlayReviewLimit
 	appStoreLimit := opts.AppStoreReviewLimit
-	totalLimit := 0
+	// `limit` is a legacy/fallback cap (max 10000 in store-worker schema), not the sum of per-store limits.
+	combinedLimit := 0
 	if opts.PlayAppID != "" {
-		totalLimit += playLimit
+		combinedLimit += playLimit
 	}
 	if opts.AppStoreAppID != "" {
-		totalLimit += appStoreLimit
+		combinedLimit += appStoreLimit
 	}
-	if totalLimit <= 0 {
-		totalLimit = 500
+	if combinedLimit <= 0 {
+		combinedLimit = 500
+	}
+	fallbackLimit := playLimit
+	if appStoreLimit > fallbackLimit {
+		fallbackLimit = appStoreLimit
+	}
+	if fallbackLimit <= 0 {
+		if combinedLimit > 10000 {
+			fallbackLimit = 10000
+		} else {
+			fallbackLimit = combinedLimit
+		}
+	}
+	if fallbackLimit > 10000 {
+		fallbackLimit = 10000
 	}
 
 	req := crawlRequest{
 		AppName:       opts.AppName,
 		PlayAppID:     opts.PlayAppID,
 		AppStoreAppID: opts.AppStoreAppID,
-		Limit:         totalLimit,
+		Limit:         fallbackLimit,
 		Lang:          lang,
 		Country:       country,
 	}
